@@ -1,1198 +1,360 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>하레하레 레시피</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>하레하레 레시피 관리</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS (Excel Export) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- FontAwesome 아이콘 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase SDK (CDN) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue, remove, push, update } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
-:root{
-  --bg:#F6EFE1;
-  --card:#FFFCF4;
-  --ink:#3A2C1D;
-  --ink-soft:#8C7A62;
-  --ink-faint:#BFAE8E;
-  --accent:#9C5F2E;
-  --accent-dark:#743F1B;
-  --accent-soft:#F0DFC0;
-  --danger:#B34438;
-  --danger-soft:#FBEAE7;
-  --ok:#6B7C4E;
-  --ok-soft:#EEF1E6;
-  --line:#E6D6B8;
-  --line-soft:#F0E5CD;
-  --shadow: 0 1px 2px rgba(58,44,29,0.05), 0 8px 20px -10px rgba(58,44,29,0.20);
-}
-*{box-sizing:border-box;}
-html,body{margin:0;padding:0;}
-body{
-  background:var(--bg);
-  color:var(--ink);
-  font-family:'Noto Sans KR', sans-serif;
-  min-height:100vh;
-  -webkit-font-smoothing:antialiased;
-}
-.mono{ font-family:'JetBrains Mono', monospace; }
-button{ font-family:inherit; cursor:pointer; }
-input, textarea{ font-family:inherit; }
+        const firebaseConfig = {
+            apiKey: "AIzaSyDQXDALOHLjmeG-lDHQ4G-Gjo25m6DjqC4",
+            authDomain: "hare-recipe.firebaseapp.com",
+            databaseURL: "https://hare-recipe-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "hare-recipe",
+            storageBucket: "hare-recipe.firebasestorage.app",
+            messagingSenderId: "851727352160",
+            appId: "1:851727352160:web:ade67411f1194e87011e05",
+            measurementId: "G-9CTWDK42GX"
+        };
 
-.shell{ max-width:900px; margin:0 auto; padding:32px 20px 90px; }
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
 
-/* ---------- header & logo (클릭 가능) ---------- */
-.brandbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; gap:12px; }
-.logo{ display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none; transition:opacity 0.2s; }
-.logo:hover{ opacity:0.8; }
-.logo .emoji{ font-size:26px; line-height:1; }
-.logo .words{ display:flex; flex-direction:column; gap:1px; }
-.logo .kr{ display:flex; align-items:baseline; gap:8px; }
-.logo .word1{ font-size:22px; font-weight:800; color:var(--ink); letter-spacing:-0.01em; }
-.logo .word2{ font-size:22px; font-weight:500; color:var(--accent); letter-spacing:-0.01em; }
-.logo .en{ font-size:10.5px; font-weight:700; letter-spacing:0.16em; color:var(--ink-faint); text-transform:uppercase; }
+        window.FB_DB = db;
+        window.FB_Ref = ref;
+        window.FB_OnValue = onValue;
+        window.FB_Set = set;
+        window.FB_Push = push;
+        window.FB_Update = update;
+        window.FB_Remove = remove;
 
-.backbtn{
-  border:none; background:none; color:var(--ink-soft); font-size:14px; font-weight:600;
-  display:flex; align-items:center; gap:5px; padding:8px 0; margin-bottom:14px;
-}
-.backbtn:hover{ color:var(--accent-dark); }
+        window.dispatchEvent(new Event('firebase-ready'));
+    </script>
 
-/* ---------- main category grid (네모칸 메뉴) ---------- */
-.cat-grid{
-  display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));
-  gap:12px; margin-bottom:20px;
-}
-.cat-card{
-  background:var(--card); border:2px solid var(--line); border-radius:14px;
-  padding:16px 12px; text-align:center; box-shadow:var(--shadow);
-  transition:all 0.2s ease; cursor:pointer; display:flex; flex-direction:column;
-  align-items:center; justify-content:center; gap:6px;
-}
-.cat-card:hover{
-  border-color:var(--accent); transform:translateY(-2px);
-  box-shadow:0 6px 16px rgba(156,95,46,0.15);
-}
-.cat-card.active{
-  background:var(--accent); border-color:var(--accent); color:#fff;
-}
-.cat-card .icon{ font-size:24px; line-height:1; }
-.cat-card .title{ font-size:15px; font-weight:800; }
-.cat-card .count{ font-size:11.5px; font-weight:600; opacity:0.8; }
-.cat-card.active .count{ color:#fff; }
-
-/* ---------- search ---------- */
-.searchwrap{ position:relative; margin-bottom:16px; }
-.searchwrap input{
-  width:100%; padding:13px 16px 13px 42px; border-radius:10px;
-  border:1px solid var(--line); background:var(--card);
-  font-size:15px; color:var(--ink); outline:none;
-}
-.searchwrap input:focus{ border-color:var(--accent); }
-.searchwrap .icon{ position:absolute; left:15px; top:50%; transform:translateY(-50%); color:var(--ink-faint); font-size:15px; }
-.searchwrap input::placeholder{ color:var(--ink-faint); }
-
-.catpicker{ display:flex; gap:7px; margin:2px 0 4px; flex-wrap:wrap; }
-.catpicker button{
-  border:1px solid var(--line); background:var(--card); color:var(--ink-soft);
-  padding:6px 13px; border-radius:16px; font-size:12.5px; font-weight:700;
-}
-.catpicker button:hover{ border-color:var(--accent); color:var(--accent-dark); }
-.catpicker button.active{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent-dark); }
-
-/* ---------- list ---------- */
-.listcard{
-  display:flex; border:1px solid var(--line); border-radius:14px;
-  background:var(--card); box-shadow:var(--shadow); overflow:hidden; height:520px;
-}
-.tabindex{
-  width:34px; flex:none; background:var(--line-soft); border-right:1px solid var(--line);
-  overflow-y:auto; padding:6px 0; scrollbar-width:none;
-}
-.tabindex::-webkit-scrollbar{ display:none; }
-.tabindex button{
-  display:block; width:100%; border:none; background:none; padding:6px 0;
-  text-align:center; font-weight:700; font-size:11.5px; color:var(--ink-faint);
-}
-.tabindex button:hover{ color:var(--accent-dark); }
-
-.listbody{ flex:1; overflow-y:auto; padding:4px 0; }
-.group-heading{
-  position:sticky; top:0; background:var(--card); padding:11px 20px 4px;
-  font-weight:700; font-size:11.5px; letter-spacing:0.06em; color:var(--accent);
-}
-.recipe-row{ display:flex; align-items:center; justify-content:space-between; padding:13px 20px; border-bottom:1px solid var(--line-soft); }
-.recipe-row:hover{ background:var(--line-soft); }
-.recipe-row button.rowbtn{ all:unset; cursor:pointer; font-size:15px; font-weight:600; color:var(--ink); flex:1; }
-.recipe-row .arrow{ color:var(--ink-faint); font-size:14px; margin-left:10px; }
-.empty-state{ padding:60px 30px; text-align:center; color:var(--ink-faint); font-size:14px; line-height:1.7; }
-
-/* ---------- buttons ---------- */
-.addbar{ display:flex; justify-content:center; gap:10px; margin-top:22px; }
-.btn{
-  border-radius:9px; border:1px solid transparent; padding:11px 18px; font-size:14px; font-weight:700;
-  display:inline-flex; align-items:center; gap:7px; white-space:nowrap;
-}
-.btn-primary{ background:var(--accent); color:#fff; }
-.btn-primary:hover{ background:var(--accent-dark); }
-.btn-ghost{ background:var(--card); border-color:var(--line); color:var(--ink-soft); }
-.btn-ghost:hover{ border-color:var(--accent); color:var(--accent-dark); }
-.btn-ok{ background:var(--ok); color:#fff; }
-.btn-ok:hover{ background:#4C6841; }
-.btn-danger{ background:transparent; color:var(--danger); border-color:#E8CFC9; }
-.btn-danger:hover{ background:var(--danger-soft); }
-.btn-sm{ padding:7px 12px; font-size:12.5px; border-radius:7px; }
-
-/* ---------- detail & view mode ---------- */
-.detailhead{ display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:10px; }
-.titlewrap{ flex:1; }
-.productname-view{ font-weight:800; font-size:26px; color:var(--ink); margin:4px 0 8px; }
-.category-badge{ display:inline-block; padding:4px 10px; background:var(--accent-soft); color:var(--accent-dark); border-radius:12px; font-size:12px; font-weight:700; }
-.productname{
-  width:100%; border:none; background:none; font-weight:800; font-size:26px; color:var(--ink);
-  padding:6px 2px; outline:none; border-bottom:2px solid transparent; border-radius:4px;
-}
-.productname:focus{ border-bottom:2px solid var(--accent); }
-.productname::placeholder{ color:var(--ink-faint); font-weight:500; }
-.fieldlabel{ font-size:11.5px; font-weight:700; color:var(--ink-faint); letter-spacing:0.04em; padding:0 2px; }
-
-.card{ background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); padding:22px 22px 24px; margin-top:18px; }
-.card h2{ font-size:15px; font-weight:700; margin:0 0 14px; color:var(--ink); display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.card h2 .tag{ font-size:11px; color:var(--ink-faint); font-weight:500; }
-.card h2 .h2actions{ display:flex; gap:8px; }
-
-/* Readonly Table Styles */
-.view-table-wrap{ overflow-x:auto; border-radius:10px; border:1px solid var(--line-soft); }
-table.view-spec{ width:100%; border-collapse:collapse; min-width:480px; }
-table.view-spec th, table.view-spec td{ padding:10px 12px; text-align:left; border-bottom:1px solid var(--line-soft); font-size:14px; }
-table.view-spec th{ background:var(--line-soft); color:var(--ink); font-weight:700; }
-table.view-spec td.amtcol{ font-family:'JetBrains Mono', monospace; font-weight:600; color:var(--accent-dark); text-align:right; }
-table.view-spec td.notecol{ color:var(--ink-soft); font-size:13px; }
-
-/* Readonly Lists */
-.view-list{ display:flex; flex-direction:column; gap:8px; margin:0; padding:0; list-style:none; }
-.view-list li{ display:flex; gap:10px; font-size:14.5px; line-height:1.6; color:var(--ink); background:#FDFCF9; padding:10px 14px; border-radius:8px; border:1px solid var(--line-soft); }
-.view-list li .num{ font-family:'JetBrains Mono', monospace; font-weight:700; color:var(--accent); flex:none; }
-
-/* ---------- Editable Table ---------- */
-.tablewrap{ overflow-x:auto; border-radius:10px; border:1px solid var(--line-soft); }
-table.spec{ width:100%; border-collapse:collapse; min-width:520px; }
-table.spec thead th{ background:var(--line-soft); color:var(--ink); font-size:12.5px; font-weight:700; padding:10px; border-bottom:1.5px solid var(--line); text-align:left; white-space:nowrap; }
-table.spec thead th.namecol{ position:sticky; left:0; background:var(--line-soft); z-index:2; min-width:150px; }
-table.spec tbody td{ padding:6px 10px; border-bottom:1px solid var(--line-soft); vertical-align:middle; }
-table.spec tbody td.namecol{ position:sticky; left:0; background:var(--card); z-index:1; min-width:150px; }
-table.spec tbody tr:hover td{ background:#FBF9F4; }
-table.spec tbody tr:hover td.namecol{ background:#FBF9F4; }
-table.spec input.cellname{ border:none; background:none; width:100%; font-size:14.5px; font-weight:600; color:var(--ink); padding:5px 4px; outline:none; border-radius:5px; }
-table.spec input.cellname:focus{ background:var(--accent-soft); }
-table.spec .amtwrap{ display:flex; align-items:center; gap:3px; }
-table.spec input.cellamt{ border:1px solid var(--line); background:#FDFCF9; width:86px; font-family:'JetBrains Mono', monospace; font-size:13.5px; padding:5px 6px; border-radius:6px; outline:none; text-align:right; }
-table.spec input.cellamt:focus{ border-color:var(--accent); }
-table.spec .gsuffix{ color:var(--ink-faint); font-size:12px; }
-table.spec input.cellnote{ border:none; background:none; width:100%; min-width:90px; font-size:13px; color:var(--ink-soft); padding:5px 4px; outline:none; border-radius:5px; }
-table.spec input.cellnote:focus{ background:var(--accent-soft); }
-table.spec th input.stdname{ background:#FDFCF9; border:1px solid var(--line); border-radius:6px; font-family:'JetBrains Mono', monospace; font-weight:700; font-size:12.5px; padding:5px 7px; width:82px; outline:none; color:var(--accent-dark); text-align:center; }
-table.spec th input.stdname::placeholder{ color:var(--ink-faint); font-weight:500; }
-table.spec th input.stdname:focus{ border-color:var(--accent); }
-.stdhead{ display:flex; align-items:center; gap:5px; }
-.colremove{ all:unset; cursor:pointer; color:var(--ink-faint); font-size:13px; width:16px; height:16px; text-align:center; line-height:16px; border-radius:50%; flex:none; }
-.colremove:hover{ color:var(--danger); background:var(--danger-soft); }
-.rowremove{ all:unset; cursor:pointer; color:var(--ink-faint); font-size:14px; padding:2px 6px; border-radius:5px; }
-.rowremove:hover{ color:var(--danger); background:var(--danger-soft); }
-.tableaddrow{ display:flex; gap:8px; margin-top:12px; }
-
-/* ---------- prep / process lists ---------- */
-.itemlist{ display:flex; flex-direction:column; gap:8px; }
-.item-row{ display:flex; align-items:flex-start; gap:9px; }
-.item-row .bullet{ flex:none; width:24px; height:24px; border-radius:50%; background:var(--line-soft); color:var(--accent-dark); font-family:'JetBrains Mono', monospace; font-weight:700; font-size:11.5px; display:flex; align-items:center; justify-content:center; margin-top:1px; }
-.item-row textarea{ flex:1; border:1px solid var(--line); background:#FDFCF9; border-radius:8px; padding:8px 10px; font-size:14px; line-height:1.55; color:var(--ink); resize:vertical; min-height:38px; outline:none; }
-.item-row textarea:focus{ border-color:var(--accent); }
-.item-remove{ all:unset; cursor:pointer; color:var(--ink-faint); font-size:14px; padding:5px 7px; margin-top:2px; border-radius:6px; }
-.item-remove:hover{ color:var(--danger); background:var(--danger-soft); }
-.additem{ margin-top:10px; }
-
-.bottomactions{ display:flex; justify-content:space-between; align-items:center; margin-top:26px; gap:10px; flex-wrap:wrap; }
-.bottomactions .left, .bottomactions .right{ display:flex; gap:8px; flex-wrap:wrap; }
-
-.savetoast{
-  position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
-  background:var(--ink); color:#FBF8F2; padding:11px 20px; border-radius:9px;
-  font-size:13.5px; font-weight:600; box-shadow:0 10px 24px -8px rgba(0,0,0,.4);
-  opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:50; max-width:90vw; text-align:center;
-}
-.savetoast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
-
-@media (max-width:640px){
-  .shell{ padding:20px 12px 80px; }
-  .logo .word1, .logo .word2{ font-size:20px; }
-  .cat-grid{ grid-template-columns:repeat(2, 1fr); }
-  .listcard{ height:460px; }
-  .productname, .productname-view{ font-size:22px; }
-  .card{ padding:16px 14px 18px; }
-  .bottomactions{ flex-direction:column; align-items:stretch; }
-  .bottomactions .left, .bottomactions .right{ justify-content:center; }
-}
-</style>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Pretendard', sans-serif; }
+    </style>
 </head>
-<body>
-<div class="shell" id="shell"></div>
-<div class="savetoast" id="toast"></div>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
-<script>
-/* ============ 천단위 쉼표 포맷팅 헬퍼 ============ */
-function formatAmount(val) {
-  if (val === null || val === undefined || val === '') return '';
-  const str = String(val).trim();
-  if (!isNaN(str) && str !== '') {
-    const parts = str.split('.');
-    parts[0] = Number(parts[0]).toLocaleString('ko-KR');
-    return parts.join('.');
-  }
-  return str.replace(/\d+/g, m => Number(m).toLocaleString('ko-KR'));
-}
-
-/* ============ 초기 전체 레시피 데이터 ============ */
-const INITIAL_DATA = [
-  {
-    id: "r_hareroll",
-    name: "하레롤 크림 / 망고롤 크림",
-    category: "케이크",
-    standards: [
-      { id: "std1", name: "하레롤(1장)" },
-      { id: "std2", name: "하레롤(6장)" },
-      { id: "std3", name: "망고롤(1장)" },
-      { id: "std4", name: "망고롤(6장)" }
-    ],
-    ingredients: [
-      { id: "i1", name: "커스터드(슈크림)", amounts: { std1: "200", std2: "1200" }, note: "" },
-      { id: "i2", name: "판젤라틴", amounts: { std1: "1.5장", std2: "9장", std3: "1.5장", std4: "9장" }, note: "" },
-      { id: "i3", name: "생크림", amounts: { std1: "430", std2: "2580" }, note: "" },
-      { id: "i4", name: "설탕", amounts: { std1: "30", std2: "180" }, note: "" },
-      { id: "i5", name: "망고청크잼", amounts: { std3: "130", std4: "780" }, note: "" },
-      { id: "i6", name: "숙성 생크림", amounts: { std3: "520", std4: "3120" }, note: "" }
-    ],
-    prep: [
-      "1장당 크림: 하레롤 650g / 망고롤 500+100g",
-      "1장당 홀(H) 3개, 피스(P) 12개 (홀 16cm, 피스 4cm)",
-      "망고롤 1장당 망고 1개~1개반 (망고 크기에 따라 조절)"
-    ],
-    steps: [
-      "[하레롤]",
-      "(1) 젤라틴 얼음물에 불리기. 불린 뒤 전자레인지에 녹이기",
-      "(2) 생크림, 설탕 90% 휘핑 후 볼에 따로 보관(냉장)",
-      "(3) 커스터드(슈크림) 덩어리 없이 풀어주고 (1) 애벌 섞기",
-      "(4) (3) 덩어리 없이 풀어주기",
-      "(5) (4)에 (2) 나눠 섞기(바닥 잘 긁어주기)",
-      "[망고롤]",
-      "(1) 젤라틴 얼음물에 불리기. 불린 뒤 전자레인지에 녹이기",
-      "(2) 숙성 생크림 90% 휘핑 후 볼에 따로 보관(냉장)",
-      "(3) 망고 청크잼에 (2) 일부 섞고 (1)에 나눠 애벌 섞기",
-      "(4) (3)과 나머지 생크림 나눠 섞기(바닥 잘 긁어주기)"
-    ]
-  },
-  {
-    id: "r_tiramisu",
-    name: "티라미수(홀/미니/더블치즈)",
-    category: "케이크",
-    standards: [
-      { id: "std1", name: "0.5배합" },
-      { id: "std2", name: "1배합" },
-      { id: "std3", name: "1.6배합" }
-    ],
-    ingredients: [
-      { id: "i1", name: "크림치즈", amounts: { std1: "750", std2: "1500", std3: "2400" }, note: "" },
-      { id: "i2", name: "물엿", amounts: { std1: "161", std2: "322", std3: "524" }, note: "" },
-      { id: "i3", name: "마스카포네", amounts: { std1: "750", std2: "1500", std3: "2400" }, note: "" },
-      { id: "i4", name: "휘핑크림 B", amounts: { std1: "322", std2: "645", std3: "1050" }, note: "" },
-      { id: "i5", name: "젤라틴매스", amounts: { std1: "150", std2: "300", std3: "450" }, note: "" },
-      { id: "i6", name: "황란(노른자)", amounts: { std1: "403", std2: "806", std3: "1310" }, note: "" },
-      { id: "i7", name: "설탕", amounts: { std1: "403", std2: "806", std3: "1310" }, note: "" },
-      { id: "i8", name: "물", amounts: { std1: "137", std2: "274", std3: "446" }, note: "" },
-      { id: "i9", name: "휘핑크림 A", amounts: { std1: "1097", std2: "2194", std3: "3560" }, note: "" },
-      { id: "i10", name: "에스프레소(시럽)", amounts: { std1: "", std2: "1328", std3: "" }, note: "" },
-      { id: "i11", name: "물(시럽)", amounts: { std1: "", std2: "247", std3: "" }, note: "" },
-      { id: "i12", name: "설탕(시럽)", amounts: { std1: "", std2: "3636.4", std3: "" }, note: "" },
-      { id: "i13", name: "깔루아(시럽)", amounts: { std1: "", std2: "681.8", std3: "" }, note: "" }
-    ],
-    prep: [
-      "0.5배합: 미니티라 45개 / 1배합: 홀티라 14~15개 / 1.6배합: 더블치즈 (개당 130g)",
-      "홀티라: 도모시트 2호와 1호는 두께 0.7cm로 잘라 준비 (1set에 2호, 1호 1장씩)",
-      "1호시트는 양면에, 2호시트는 한 면에 시럽을 충분히 발라둔다.",
-      "2호 원형 세라클은 랩질+띠지를 둘러 냉판(OPP)에 준비한다.",
-      "미니딸기(망고)티라 준비: 시트+시럽+청크잼 20g"
-    ],
-    steps: [
-      "1. 젤라틴은 얼음물에 불린다. 휘핑크림은 50% 휘핑한 뒤 냉장고에 잠시 보관한다.",
-      "2. 크림치즈+물엿은 덩어리 없이 부드럽게 풀어준다. (비터)",
-      "3. (2)에 마스카포네를 나눠 섞어 풀어준 뒤 뜨겁게 데운 휘핑크림B를 섞는다.",
-      "4. 황란을 공기 포집하고 설탕, 물을 냄비에 118℃까지 끓여 시럽을 만든다.",
-      "5. (4)의 황란에 시럽을 부어 공기 포집한다. (파트 아 봄브)",
-      "6. (5)의 일부를 녹인 젤라틴에 섞는다. 이를 봄브 전체에 가볍게 섞는다.",
-      "7. (3)에 (6)을 나눠 섞는다. 다 섞이면 (1)의 휘핑크림을 나눠 섞는다.",
-      "홀티라: 무스 1/2 붓기 -> 1호 시트 -> 나머지 무스(시트 두께만큼 남기고) -> 2호 시트",
-      "미니티라: 무스 90~100g / 미니딸기티라: 무스 85~95g",
-      "TIP: 완성한 무스는 체에 걸러서 사용한다. 베이스에 재료를 섞을 때 바닥과 옆면을 잘 긁어줘야 덩어리지지 않는다."
-    ]
-  },
-  {
-    id: "r_pudding",
-    name: "캐러멜 푸딩",
-    category: "케이크",
-    standards: [
-      { id: "std1", name: "1배합" },
-      { id: "std2", name: "2배합" }
-    ],
-    ingredients: [
-      { id: "i1", name: "설탕", amounts: { std1: "820", std2: "1640" }, note: "" },
-      { id: "i2", name: "생크림 35%", amounts: { std1: "1584", std2: "3168" }, note: "" },
-      { id: "i3", name: "물엿", amounts: { std1: "126", std2: "252" }, note: "" },
-      { id: "i4", name: "노른자", amounts: { std1: "480", std2: "960" }, note: "" },
-      { id: "i5", name: "바닐라 페이스트", amounts: { std1: "10", std2: "20" }, note: "" },
-      { id: "i6", name: "젤라틴 매스", amounts: { std1: "90", std2: "180" }, note: "" }
-    ],
-    prep: ["1배합당 푸딩 약 220개 생산"],
-    steps: [
-      "(1) 설탕 캐러멜화(진한 갈색), 생크림+물엿 끓이기",
-      "(2) 캐러멜화한 설탕에 끓인 생크림 나눠 섞기(약불)",
-      "(3) 노른자+바닐라페이스트에 체에 거른 (2) 조금씩 나눠 섞기",
-      "(4) (3) 냄비에 옮겨 앙글레이즈 끓이기",
-      "(5) (4)에 젤라틴 매스 섞은 후 체에 걸러 짤주머니에 담아 보관",
-      "[완성] 식은 푸딩에 생크림 짜고(큰 원형깍지) 캐러멜 소스 얹기. 발로나화이트구슬 1개"
-    ]
-  },
-  {
-    id: "r_ganache_monte",
-    name: "가나슈 몽떼(초코밭테디)",
-    category: "케이크",
-    standards: [
-      { id: "std1", name: "1배합" },
-      { id: "std2", name: "2.1배합" },
-      { id: "std3", name: "5배합" }
-    ],
-    ingredients: [
-      { id: "i1", name: "다크 초콜릿", amounts: { std1: "170", std2: "357", std3: "850" }, note: "" },
-      { id: "i2", name: "밀크 초콜릿", amounts: { std1: "100", std2: "210", std3: "500" }, note: "" },
-      { id: "i3", name: "생크림", amounts: { std1: "750", std2: "1575", std3: "3750" }, note: "" },
-      { id: "i4", name: "트레할로스", amounts: { std1: "20", std2: "42", std3: "100" }, note: "" }
-    ],
-    prep: [
-      "1배합: 3.8개 / 2.1배합: 약 8개 / 5배합: 19개",
-      "보관 시 밀착 랩핑 필수"
-    ],
-    steps: [
-      "1. 다크, 밀크 초콜릿 80% 이상 녹이기",
-      "2. 생크림+트레할로스 70℃ 이상 데우기",
-      "3. (1)에 (2) 3~4번 나눠 섞기(처음에 덩어리 없이 잘 섞어줘야 함)",
-      "4. (3) 바믹서로 유화. 최소 12시간 이상 냉장 숙성 후 휘핑해서 사용",
-      "[샌드] 생 1호 띠지 두르고 키리쉬 시트, 806번 깍지로 옆면에 보이도록 짜기 (3단 샌드 / 윗면에 빈공간 0.5cm 이하 남도록)"
-    ]
-  },
-  {
-    id: "r_amer",
-    name: "아메르",
-    category: "케이크",
-    standards: [{ id: "std1", name: "기본" }],
-    ingredients: [
-      { id: "i1", name: "코코아 매스 (토핑)", amounts: { std1: "190" }, note: "" },
-      { id: "i2", name: "다크 초콜릿 (토핑)", amounts: { std1: "300" }, note: "" },
-      { id: "i3", name: "버터크림 (토핑)", amounts: { std1: "2970" }, note: "6팩" },
-      { id: "i4", name: "초코 시럽 (가나슈)", amounts: { std1: "1350" }, note: "" },
-      { id: "i5", name: "다크 초콜릿 (가나슈)", amounts: { std1: "640" }, note: "" },
-      { id: "i6", name: "생크림 (가나슈)", amounts: { std1: "1800" }, note: "" },
-      { id: "i7", name: "다크 초콜릿 (글라사주)", amounts: { std1: "300" }, note: "" },
-      { id: "i8", name: "젤라틴매스 (글라사주)", amounts: { std1: "40" }, note: "" }
-    ],
-    prep: [
-      "샌드량: 가나슈 크림 720g, 토핑 크림 290g, 글라사주 440g씩",
-      "재단: 8.5~9cm, 샌드 높이 7cm",
-      "아메르 시트 종이 벗겨서 준비(샌드하면서 판에서 빼기. 시럽 충분히)",
-      "샌드 후 냉장 보관, 다음 날 글라사주 씌우고 정리"
-    ],
-    steps: [
-      "[가나슈 크림] 1. 다크 초콜릿은 중탕으로 녹인다(60℃). 생크림은 50~60% 휘핑한다. 2. 초콜릿에 생크림 일부를 섞고 나머지를 섞는다(휘퍼).",
-      "[토핑 크림] 1. 코코아 매스, 다크 초콜릿은 전자레인지에 녹인다. 2. 버터크림은 부드럽게 풀어주고 녹인 초콜릿을 나눠 섞는다.",
-      "[글라사주] 1. 젤라틴은 얼음물에 불린다. 초코 시럽, 다크 초콜릿은 중탕으로 녹인다(50~60°C). 2. 녹인 초콜릿에 불린 젤라틴을 섞는다.",
-      "[조립] 시트(시럽) -> 토핑 크림, 가나슈 크림 3번 반복 -> 시트(시럽) -> 토핑 크림 나머지 -> 글라사주(최소한의 횟수로 밀어 펴기)",
-      "재단: 가장자리 잘라낸 후 총 길이 잰 뒤 8.5~9cm 가로x세로 재단 후 8cm 얇은 띠지"
-    ]
-  },
-  {
-    id: "r_fresh_cream",
-    name: "생크림 배합 모음",
-    category: "케이크",
-    standards: [
-      { id: "std1", name: "일반 7:3" },
-      { id: "std2", name: "일반 8:2" },
-      { id: "std3", name: "요거트" },
-      { id: "std4", name: "망고" },
-      { id: "std5", name: "얼그레이" }
-    ],
-    ingredients: [
-      { id: "i1", name: "생크림(서울 500ml)", amounts: { std1: "7000", std2: "8000" }, note: "7:3은 14팩, 8:2는 16팩" },
-      { id: "i2", name: "라르샤", amounts: { std1: "3000", std2: "2000", std3: "2000" }, note: "요거트: 2000g 기준" },
-      { id: "i3", name: "설탕", amounts: { std1: "950", std2: "950", std3: "82", std5: "320" }, note: "" },
-      { id: "i4", name: "안정제", amounts: { std1: "60", std2: "60" }, note: "" },
-      { id: "i5", name: "트리플섹", amounts: { std1: "100", std2: "100" }, note: "" },
-      { id: "i6", name: "요거트 파우더", amounts: { std3: "500" }, note: "" },
-      { id: "i7", name: "피치 트리", amounts: { std3: "33" }, note: "" },
-      { id: "i8", name: "망고 청크잼", amounts: { std4: "75" }, note: "일반생크림 300g 기준" },
-      { id: "i9", name: "홍차 잎", amounts: { std5: "30" }, note: "생크림 3000g 기준" }
-    ],
-    prep: ["생크림 수급 상황에 따라 비율 조절"],
-    steps: ["각 크림 종류별 배합 비율에 맞춰 휘핑하여 준비한다."]
-  },
-  {
-    id: "r_tangjong_bread",
-    name: "탕종식빵",
-    category: "빵",
-    standards: [
-      { id: "std1", name: "24통" },
-      { id: "std2", name: "28통(평일)" },
-      { id: "std3", name: "30통" },
-      { id: "std4", name: "32통(주말)" }
-    ],
-    ingredients: [
-      { id: "i1", name: "하레믹스", amounts: { std1: "9240", std2: "10780", std3: "11550", std4: "12320" }, note: "" },
-      { id: "i2", name: "강력분", amounts: { std1: "5280", std2: "6160", std3: "6600", std4: "7040" }, note: "" },
-      { id: "i3", name: "생이스트", amounts: { std1: "432", std2: "504", std3: "540", std4: "576" }, note: "" },
-      { id: "i4", name: "소금", amounts: { std1: "90", std2: "112", std3: "120", std4: "128" }, note: "" },
-      { id: "i5", name: "글루텐프리", amounts: { std1: "144", std2: "168", std3: "180", std4: "192" }, note: "" },
-      { id: "i6", name: "물", amounts: { std1: "3040", std2: "3800", std3: "4070", std4: "4342" }, note: "" },
-      { id: "i7", name: "우유", amounts: { std1: "4600", std2: "5367", std3: "5750", std4: "6133" }, note: "" },
-      { id: "i8", name: "탕종", amounts: { std1: "3162", std2: "3696", std3: "3960", std4: "4224" }, note: "" },
-      { id: "i9", name: "버터", amounts: { std1: "792", std2: "924", std3: "990", std4: "1056" }, note: "" }
-    ],
-    prep: ["수량 조정 시 4통 단위로 계산"],
-    steps: ["모든 재료를 혼합 후 탕종법 공정에 따라 제빵 조작 진행."]
-  },
-  {
-    id: "r_sio_pan",
-    name: "시오빵 (소금빵)",
-    category: "빵",
-    standards: [
-      { id: "std1", name: "310개" },
-      { id: "std2", name: "370개" },
-      { id: "std3", name: "430개" },
-      { id: "std4", name: "490개" }
-    ],
-    ingredients: [
-      { id: "i1", name: "강력분", amounts: { std1: "9269", std2: "11063", std3: "12857", std4: "14651" }, note: "" },
-      { id: "i2", name: "박력분", amounts: { std1: "2294", std2: "2738", std3: "3182", std4: "3626" }, note: "" },
-      { id: "i3", name: "소금", amounts: { std1: "248", std2: "296", std3: "344", std4: "392" }, note: "" },
-      { id: "i4", name: "S-500", amounts: { std1: "155", std2: "185", std3: "215", std4: "245" }, note: "" },
-      { id: "i5", name: "골드이스트", amounts: { std1: "93", std2: "111", std3: "129", std4: "147" }, note: "" },
-      { id: "i6", name: "설탕", amounts: { std1: "1054", std2: "1258", std3: "1462", std4: "1666" }, note: "" },
-      { id: "i7", name: "감자", amounts: { std1: "403", std2: "481", std3: "559", std4: "637" }, note: "" },
-      { id: "i8", name: "버터", amounts: { std1: "806", std2: "962", std3: "1118", std4: "1274" }, note: "" },
-      { id: "i9", name: "연유", amounts: { std1: "465", std2: "555", std3: "645", std4: "735" }, note: "" },
-      { id: "i10", name: "물", amounts: { std1: "7285", std2: "8695", std3: "10105", std4: "11515" }, note: "" }
-    ],
-    prep: ["10개 단위 기본 배합 기준으로 환산 가능"],
-    steps: ["반죽 -> 1차발효 -> 성형(버터롤 형태) -> 2차발효 -> 소금 뿌리기 후 굽기"]
-  },
-  {
-    id: "r_ciabatta",
-    name: "치아바타",
-    category: "빵",
-    standards: [
-      { id: "std1", name: "월~금" },
-      { id: "std2", name: "토요일" },
-      { id: "std3", name: "일요일" }
-    ],
-    ingredients: [
-      { id: "i1", name: "T-55", amounts: { std1: "5782", std2: "6867", std3: "6655" }, note: "" },
-      { id: "i2", name: "설탕", amounts: { std1: "442", std2: "524", std3: "508" }, note: "" },
-      { id: "i3", name: "소금", amounts: { std1: "175", std2: "207", std3: "201" }, note: "" },
-      { id: "i4", name: "생이스트", amounts: { std1: "122", std2: "91", std3: "88" }, note: "" },
-      { id: "i5", name: "중종", amounts: { std1: "5672", std2: "6736", std3: "6529" }, note: "" },
-      { id: "i6", name: "트레디지", amounts: { std1: "56", std2: "66", std3: "64" }, note: "" },
-      { id: "i7", name: "물", amounts: { std1: "4980", std2: "5914", std3: "5732" }, note: "" },
-      { id: "i8", name: "감자", amounts: { std1: "4417", std2: "5246", std3: "5104" }, note: "" },
-      { id: "i9", name: "올리브 오일", amounts: { std1: "505", std2: "584", std3: "568" }, note: "" },
-      { id: "i10", name: "올리브", amounts: { std1: "400", std2: "564", std3: "532" }, note: "" },
-      { id: "i11", name: "롤치즈/체다치즈", amounts: { std1: "200", std2: "282", std3: "266" }, note: "" }
-    ],
-    prep: ["부재료 전처리: 감자, 무화과, 올리브 등 종류별 샌드위치용 반죽 분할 준비"],
-    steps: ["무설탕/고수율 반죽 특성을 고려하여 폴딩 작업 진행 후 최종 성형 후 고온 굽기"]
-  },
-  {
-    id: "r_egg_sio",
-    name: "에그 시오 빵",
-    category: "빵",
-    standards: [
-      { id: "std1", name: "6개" },
-      { id: "std2", name: "30개" },
-      { id: "std3", name: "50개" }
-    ],
-    ingredients: [
-      { id: "i1", name: "계란", amounts: { std1: "8개", std2: "32개", std3: "52개" }, note: "" },
-      { id: "i2", name: "마요네즈", amounts: { std1: "40", std2: "200", std3: "320" }, note: "" },
-      { id: "i3", name: "허니머스타드", amounts: { std1: "20", std2: "100", std3: "160" }, note: "" },
-      { id: "i4", name: "소금", amounts: { std1: "1", std2: "5", std3: "8" }, note: "" },
-      { id: "i5", name: "설탕", amounts: { std1: "1", std2: "5", std3: "8" }, note: "" },
-      { id: "i6", name: "베이컨 반줄", amounts: { std1: "6", std2: "30", std3: "50" }, note: "" }
-    ],
-    prep: ["시오빵 1개당 계란 1개 기준 계산"],
-    steps: [
-      "1. 계란을 삶아서 깐 후 철망에 놓고 으깬다.",
-      "2. 모든 재료(마요네즈, 허니머스타드, 소금, 설탕, 후추)를 넣고 섞는다.",
-      "3. 시오빵을 사선으로 잘라서 슬라이스 햄 반쪽을 넣는다.",
-      "4. 비닐 짤주머니 구멍을 크게 잘라서 한 줄 두껍게 짠다."
-    ]
-  },
-  {
-    id: "r_yakisoba",
-    name: "야끼소바 빵",
-    category: "빵",
-    standards: [
-      { id: "std1", name: "5개" },
-      { id: "std2", name: "30개" },
-      { id: "std3", name: "50개" }
-    ],
-    ingredients: [
-      { id: "i1", name: "야끼소바 면", amounts: { std1: "1봉지", std2: "6봉지", std3: "10봉지" }, note: "" },
-      { id: "i2", name: "양배추", amounts: { std1: "100", std2: "600", std3: "1000" }, note: "" },
-      { id: "i3", name: "양파", amounts: { std1: "70", std2: "420", std3: "700" }, note: "" },
-      { id: "i4", name: "소세지", amounts: { std1: "80", std2: "240", std3: "400" }, note: "5개당 2개(80g)" },
-      { id: "i5", name: "소스", amounts: { std1: "50", std2: "300", std3: "500" }, note: "" },
-      { id: "i6", name: "카라멜", amounts: { std1: "1", std2: "6", std3: "10" }, note: "" }
-    ],
-    prep: ["야끼소바 소스 배합: 스리라차 350g(1통) + 연유 350g + 마요네즈 700g 섞기"],
-    steps: [
-      "1. 야끼소바 면 및 야채, 소세지를 볶는다.",
-      "2. 소스 및 카라멜로 간을 맞춘다.",
-      "3. 빵 사이에 볶은 야끼소바를 채워 넣는다."
-    ]
-  },
-  {
-    id: "r_redwine",
-    name: "레드와인 식빵 / 반죽",
-    category: "빵",
-    standards: [{ id: "std1", name: "기본배합" }],
-    ingredients: [
-      { id: "i1", name: "강력분", amounts: { std1: "1963" }, note: "" },
-      { id: "i2", name: "설탕", amounts: { std1: "193" }, note: "" },
-      { id: "i3", name: "소금", amounts: { std1: "36" }, note: "" },
-      { id: "i4", name: "중종", amounts: { std1: "572" }, note: "" },
-      { id: "i5", name: "이스트", amounts: { std1: "57" }, note: "" },
-      { id: "i6", name: "물", amounts: { std1: "1063" }, note: "" },
-      { id: "i7", name: "르방", amounts: { std1: "392" }, note: "" },
-      { id: "i8", name: "레드와인", amounts: { std1: "193" }, note: "" },
-      { id: "i9", name: "버터", amounts: { std1: "99" }, note: "" },
-      { id: "i10", name: "크랜베리", amounts: { std1: "792" }, note: "총 반죽: 5,360g" }
-    ],
-    prep: ["와인 풍미 배합을 위해 믹싱 온도 유지"],
-    steps: ["모든 재료 믹싱 후 1차 발효 진행, 크랜베리 혼합 후 성형."]
-  },
-  {
-    id: "r_cheeseberry",
-    name: "치즈베리",
-    category: "빵",
-    standards: [{ id: "std1", name: "기본배합" }],
-    ingredients: [
-      { id: "i1", name: "강력분", amounts: { std1: "6068" }, note: "" },
-      { id: "i2", name: "T-55", amounts: { std1: "2385" }, note: "" },
-      { id: "i3", name: "쌀프리믹스", amounts: { std1: "596" }, note: "" },
-      { id: "i4", name: "미강", amounts: { std1: "596" }, note: "" },
-      { id: "i5", name: "이스트", amounts: { std1: "88" }, note: "" },
-      { id: "i6", name: "소금", amounts: { std1: "106" }, note: "" },
-      { id: "i7", name: "중종", amounts: { std1: "1692" }, note: "" },
-      { id: "i8", name: "물", amounts: { std1: "3800" }, note: "" },
-      { id: "i9", name: "리벤도", amounts: { std1: "30" }, note: "1kg=5g 기준" },
-      { id: "i10", name: "콩 / 팥", amounts: { std1: "399 / 199" }, note: "반죽무게 3,906g" },
-      { id: "i11", name: "듀럼", amounts: { std1: "210" }, note: "" },
-      { id: "i12", name: "크랜베리 / 호두", amounts: { std1: "164 / 90" }, note: "반죽무게 3,900g" },
-      { id: "i13", name: "코코넛 / 치즈", amounts: { std1: "112 / 450" }, note: "반죽무게 4,205g" }
-    ],
-    prep: ["부재료별 반죽 분할량에 주의"],
-    steps: ["믹싱 후 1차 발효 -> 분할 -> 롤치즈 및 크랜베리 충전 -> 성형 및 굽기"]
-  },
-  {
-    id: "r_baguette",
-    name: "바게트 (무가당)",
-    category: "빵",
-    standards: [{ id: "std1", name: "기본배합" }],
-    ingredients: [
-      { id: "i1", name: "T-55", amounts: { std1: "4580" }, note: "" },
-      { id: "i2", name: "소금", amounts: { std1: "84" }, note: "" },
-      { id: "i3", name: "레드이스트", amounts: { std1: "9" }, note: "" },
-      { id: "i4", name: "트라디지", amounts: { std1: "45" }, note: "" },
-      { id: "i5", name: "글루텐", amounts: { std1: "45" }, note: "" },
-      { id: "i6", name: "물", amounts: { std1: "3220" }, note: "" },
-      { id: "i7", name: "몰트", amounts: { std1: "9" }, note: "" },
-      { id: "i8", name: "호두", amounts: { std1: "311" }, note: "최소 4,200g" }
-    ],
-    prep: ["믹스 경우 가루 제외 이스트 수량 확인"],
-    steps: ["오토리즈 후 믹싱 -> 폴딩 -> 성형 -> 쿠프 후 스팀 굽기"]
-  },
-  {
-    id: "r_rice_campagne",
-    name: "쌀깜빠뉴",
-    category: "빵",
-    standards: [{ id: "std1", name: "기본배합" }],
-    ingredients: [
-      { id: "i1", name: "강력 쌀가루", amounts: { std1: "1154" }, note: "" },
-      { id: "i2", name: "이스트", amounts: { std1: "18" }, note: "" },
-      { id: "i3", name: "소금", amounts: { std1: "36" }, note: "" },
-      { id: "i4", name: "미강", amounts: { std1: "153" }, note: "" },
-      { id: "i5", name: "중종", amounts: { std1: "972" }, note: "" },
-      { id: "i6", name: "물", amounts: { std1: "873" }, note: "" },
-      { id: "i7", name: "마카다미아", amounts: { std1: "135" }, note: "" },
-      { id: "i8", name: "크랜베리/호두", amounts: { std1: "270/180" }, note: "" },
-      { id: "i9", name: "폴리쉬(당일 물/레드이스트/르방/에펠55)", amounts: { std1: "297 / 7 / 153 / 297" }, note: "" }
-    ],
-    prep: ["당일 폴리쉬 반죽 미리 제조"],
-    steps: ["폴리쉬 및 본반죽 믹싱 후 호두/크랜베리 섞기 -> 발효 후 굽기"]
-  },
-  {
-    id: "r_focaccia",
-    name: "포카치아",
-    category: "빵",
-    standards: [{ id: "std1", name: "기본배합" }],
-    ingredients: [
-      { id: "i1", name: "강력분", amounts: { std1: "1340" }, note: "" },
-      { id: "i2", name: "T-55", amounts: { std1: "660" }, note: "" },
-      { id: "i3", name: "생이스트", amounts: { std1: "40" }, note: "" },
-      { id: "i4", name: "설탕", amounts: { std1: "116" }, note: "" },
-      { id: "i5", name: "소금", amounts: { std1: "44" }, note: "" },
-      { id: "i6", name: "중종", amounts: { std1: "320" }, note: "" },
-      { id: "i7", name: "물", amounts: { std1: "1560" }, note: "" },
-      { id: "i8", name: "올리브유", amounts: { std1: "160" }, note: "" },
-      { id: "i9", name: "딜, 오레가노 / 후추", amounts: { std1: "3 / 4" }, note: "" },
-      { id: "i10", name: "글루텐", amounts: { std1: "20" }, note: "" },
-      { id: "i11", name: "블랙/그린올리브", amounts: { std1: "116 / 116" }, note: "" },
-      { id: "i12", name: "감자", amounts: { std1: "320" }, note: "" }
-    ],
-    prep: ["반죽 온도를 20~22℃로 맞춘다."],
-    steps: ["올리브 및 감자, 허브를 넣어 믹싱 후 철판에 펴서 발효 후 굽기."]
-  },
-  {
-    id: "r_corn_bread",
-    name: "옥수수 빵",
-    category: "빵",
-    standards: [{ id: "std1", name: "기본배합" }],
-    ingredients: [
-      { id: "i1", name: "강력분", amounts: { std1: "1863" }, note: "" },
-      { id: "i2", name: "소프트T", amounts: { std1: "111" }, note: "" },
-      { id: "i3", name: "옥수수 분말", amounts: { std1: "646" }, note: "" },
-      { id: "i4", name: "설탕", amounts: { std1: "220" }, note: "" },
-      { id: "i5", name: "소금", amounts: { std1: "35" }, note: "" },
-      { id: "i6", name: "생이스트", amounts: { std1: "55" }, note: "" },
-      { id: "i7", name: "버터", amounts: { std1: "182" }, note: "" },
-      { id: "i8", name: "전란", amounts: { std1: "410" }, note: "" },
-      { id: "i9", name: "물", amounts: { std1: "1500" }, note: "" },
-      { id: "i10", name: "르방", amounts: { std1: "748" }, note: "" },
-      { id: "i11", name: "레진", amounts: { std1: "182" }, note: "" },
-      { id: "i12", name: "옥수수/콩", amounts: { std1: "285" }, note: "총 반죽: 6,237g" }
-    ],
-    prep: ["부재료 물기 제거"],
-    steps: ["본반죽 형성 후 옥수수 및 콩을 혼합하여 성형 후 오븐 굽기."]
-  },
-  {
-    id: "r_rye_100",
-    name: "100% 호밀빵",
-    category: "빵",
-    standards: [{ id: "std1", name: "기본배합" }],
-    ingredients: [
-      { id: "i1", name: "호밀종(완성)", amounts: { std1: "360" }, note: "" },
-      { id: "i2", name: "호밀가루", amounts: { std1: "720" }, note: "" },
-      { id: "i3", name: "생이스트", amounts: { std1: "3" }, note: "" },
-      { id: "i4", name: "소금", amounts: { std1: "27" }, note: "" },
-      { id: "i5", name: "물(50℃)", amounts: { std1: "1400" }, note: "1,2차 분할 투입" },
-      { id: "i6", name: "글루텐", amounts: { std1: "7" }, note: "" }
-    ],
-    prep: ["호밀종 3차 단계 사전 준비 (호밀종+T55+물)"],
-    steps: ["호밀 특성에 맞춰 저속 믹싱 후 틀 반죽 후 고온 발효 굽기."]
-  },
-  {
-    id: "r_red_bean",
-    name: "수제 팥앙금",
-    category: "쿠키",
-    standards: [
-      { id: "std1", name: "1kg 기준" },
-      { id: "std2", name: "5kg 기준" },
-      { id: "std3", name: "8kg 기준" }
-    ],
-    ingredients: [
-      { id: "i1", name: "팥", amounts: { std1: "1000", std2: "5000", std3: "8000" }, note: "" },
-      { id: "i2", name: "설탕", amounts: { std1: "450", std2: "2250", std3: "3600" }, note: "" },
-      { id: "i3", name: "트레하", amounts: { std1: "200", std2: "1000", std3: "1600" }, note: "" },
-      { id: "i4", name: "물엿", amounts: { std1: "200", std2: "1000", std3: "1600" }, note: "" },
-      { id: "i5", name: "소금", amounts: { std1: "10", std2: "50", std3: "80" }, note: "" },
-      { id: "i6", name: "계피", amounts: { std1: "1", std2: "5", std3: "10" }, note: "" },
-      { id: "i7", name: "호두", amounts: { std1: "62", std2: "310", std3: "500" }, note: "" }
-    ],
-    prep: ["팥 삶기 전 불리기 작업"],
-    steps: ["1. 팥을 푹 삶은 뒤 수분을 날리며 설탕, 트레하, 물엿, 소금 투입", "2. 농도가 잡히면 계피와 호두를 넣고 식힘."]
-  },
-  {
-    id: "r_sub_sauces",
-    name: "주요 소스 및 시럽 배합 모음",
-    category: "소스",
-    standards: [{ id: "std1", name: "1배합" }],
-    ingredients: [
-      { id: "i1", name: "야끼소바 소스(스리라차+연유+마요)", amounts: { std1: "350g + 350g + 700g" }, note: "1:1:2 비율" },
-      { id: "i2", name: "명란감자 소스(마요+설탕+마늘)", amounts: { std1: "1000g + 100g + 20g" }, note: "혼합" },
-      { id: "i3", name: "주전자 시럽(물+설탕)", amounts: { std1: "4500g + 1500g" }, note: "끓임" },
-      { id: "i4", name: "츄러스 설탕(설탕+계피)", amounts: { std1: "3000g + 100g" }, note: "혼합" },
-      { id: "i5", name: "인절미 가루(콩가루+설탕)", amounts: { std1: "1000g + 1000g" }, note: "혼합" },
-      { id: "i6", name: "말차 가루(콩가루+설탕+말차)", amounts: { std1: "1000g + 100g + 200g" }, note: "혼합" }
-    ],
-    prep: ["필요시 용량별 배수 조절"],
-    steps: ["각 재료를 적혀있는 비율대로 균일하게 섞거나 끓여서 사용."]
-  }
-];
-
-/* ============ 상태 관리 및 데이터 로드 ============ */
-const STORE_KEY = 'harehare_recipes_v3';
-const CHO = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
-const CATEGORIES = ['빵','쿠키','케이크','소스'];
-const CAT_ICONS = { '전체': '📋', '빵': '🍞', '쿠키': '🍪', '케이크': '🍰', '소스': '🍯' };
-
-function uid(){ return 'id_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
-
-function loadData(){
-  try{
-    const raw = localStorage.getItem(STORE_KEY);
-    if(raw) {
-      const parsed = JSON.parse(raw);
-      if(Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  }catch(e){}
-  saveData(INITIAL_DATA);
-  return INITIAL_DATA;
-}
-function saveData(data){ localStorage.setItem(STORE_KEY, JSON.stringify(data)); }
-
-let DATA = loadData();
-let VIEW = { page:'home', recipeId:null, mode:'view', search:'', category:'all' };
-
-/* ============ 유틸 함수 ============ */
-function getCho(str){
-  if(!str) return '#';
-  const c = str.charCodeAt(0);
-  if(isNaN(c) || c < 0xAC00 || c > 0xD7A3) return '#';
-  return CHO[Math.floor((c-0xAC00)/588)];
-}
-function sortedRecipes(list){ return [...list].sort((a,b)=> a.name.localeCompare(b.name,'ko')); }
-function toast(msg){
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(toast._t);
-  toast._t = setTimeout(()=> t.classList.remove('show'), 1800);
-}
-function escapeHtml(s){
-  return String(s??'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-}
-function findRecipe(id){ return DATA.find(r=>r.id===id); }
-function persist(){ saveData(DATA); }
-function currentRecipe(){ return findRecipe(VIEW.recipeId); }
-
-/* ============ 공통 상단 로고 HTML 생성 ============ */
-function getBrandBarHtml(){
-  return `
-    <div class="brandbar">
-      <div class="logo" onclick="goHome()" title="메인 화면으로 이동">
-        <span class="emoji">🍞</span>
-        <div class="words">
-          <div class="kr"><span class="word1">하레하레</span><span class="word2">레시피</span></div>
-          <div class="en">Harehare Recipe</div>
+    <!-- 상단 헤더 -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-amber-500 text-white p-2.5 rounded-xl shadow-md">
+                    <i class="fa-solid fa-bread-slice text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-slate-900">하레하레 레시피</h1>
+                    <p class="text-xs text-slate-500">실시간 공유 베이커리/카페 레시피 관리 시스템</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button onclick="openAddModal()" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> 새 레시피 추가
+                </button>
+                <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2">
+                    <i class="fa-solid fa-file-excel"></i> 엑셀 다운로드
+                </button>
+            </div>
         </div>
-      </div>
-    </div>
-  `;
-}
+    </header>
 
-/* ============ 홈 화면 ============ */
-function renderHome(){
-  const shell = document.getElementById('shell');
-  shell.innerHTML = `
-    ${getBrandBarHtml()}
+    <!-- 메인 컨테이너 -->
+    <main class="max-w-7xl mx-auto px-4 py-6 flex-grow w-full grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        <!-- 좌측: 카테고리 및 검색 -->
+        <aside class="lg:col-span-1 space-y-4">
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">레시피 검색</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                        <i class="fa-solid fa-search"></i>
+                    </span>
+                    <input type="text" id="searchInput" oninput="filterRecipes()" placeholder="제품명, 재료 검색..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+                </div>
+            </div>
 
-    <!-- 네모칸 카테고리 그리드 메뉴 -->
-    <div class="cat-grid" id="catGrid"></div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">카테고리</h2>
+                <div id="categoryList" class="space-y-1"></div>
+            </div>
+        </aside>
 
-    <div class="searchwrap">
-      <span class="icon">⌕</span>
-      <input id="searchInput" type="text" placeholder="제품명으로 검색" value="${escapeHtml(VIEW.search)}"
-        oninput="VIEW.search=this.value; updateList();">
-    </div>
+        <!-- 우측: 레시피 목록 및 상세 뷰 -->
+        <section class="lg:col-span-3 space-y-4">
+            <div id="recipeContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        </section>
+    </main>
 
-    <div class="listcard">
-      <div class="tabindex" id="tabIndex"></div>
-      <div class="listbody" id="listbody"></div>
-    </div>
-
-    <div class="addbar">
-      <button class="btn btn-primary" onclick="newRecipe()">＋ 새 레시피 추가</button>
-    </div>
-  `;
-  renderCatGrid();
-  updateList();
-}
-
-function renderCatGrid(){
-  const items = [{key:'all', label:'전체'}, ...CATEGORIES.map(c=>({key:c, label:c}))];
-  document.getElementById('catGrid').innerHTML = items.map(c=>{
-    const count = c.key === 'all' 
-      ? DATA.length 
-      : DATA.filter(r => r.category === c.key).length;
-    const icon = CAT_ICONS[c.label] || '📄';
-    const isActive = VIEW.category === c.key ? 'active' : '';
-
-    return `
-      <div class="cat-card ${isActive}" onclick="setCategory('${c.key}')">
-        <div class="icon">${icon}</div>
-        <div class="title">${c.label}</div>
-        <div class="count">${count}개의 레시피</div>
-      </div>
-    `;
-  }).join('');
-}
-
-function setCategory(cat){
-  VIEW.category = cat;
-  renderCatGrid();
-  updateList();
-}
-
-function updateList(){
-  const q = VIEW.search.trim();
-  let list = sortedRecipes(DATA);
-  if(q) list = list.filter(r=> r.name.toLowerCase().includes(q.toLowerCase()));
-  if(VIEW.category !== 'all') list = list.filter(r=> r.category === VIEW.category);
-
-  const groups = {};
-  list.forEach(r=>{ const k=getCho(r.name); (groups[k] ||= []).push(r); });
-  const groupKeys = Object.keys(groups).sort();
-
-  let listHtml = '';
-  if(list.length===0){
-    const msg = (q || VIEW.category!=='all') ? '조건에 맞는 레시피가 없어요.' : '아직 등록된 레시피가 없어요.<br>아래 "새 레시피 추가" 버튼으로 시작해보세요.';
-    listHtml = `<div class="empty-state">${msg}</div>`;
-  }else{
-    groupKeys.forEach(k=>{
-      const gid = k==='#' ? 'hash' : k;
-      listHtml += `<div class="group-heading" id="grp-${gid}">${k}</div>`;
-      groups[k].forEach(r=>{
-        listHtml += `
-          <div class="recipe-row">
-            <button class="rowbtn" onclick="openRecipe('${r.id}')">${r.name ? escapeHtml(r.name) : '(제품명 미입력)'}</button>
-            <span class="arrow">›</span>
-          </div>`;
-      });
-    });
-  }
-  document.getElementById('listbody').innerHTML = listHtml;
-  document.getElementById('tabIndex').innerHTML = groupKeys.map(k=>{
-    const target = k==='#' ? 'hash' : k;
-    return `<button onclick="scrollToGroup('${target}')">${k}</button>`;
-  }).join('');
-}
-function scrollToGroup(k){
-  const el = document.getElementById('grp-'+k);
-  if(el) el.scrollIntoView({block:'start'});
-}
-
-/* ============ 레시피 상세보기 & 편집 연결 ============ */
-function openRecipe(id){ VIEW.page='detail'; VIEW.recipeId=id; VIEW.mode='view'; renderDetail(); }
-function newRecipe(){
-  const cat = CATEGORIES.includes(VIEW.category) ? VIEW.category : CATEGORIES[0];
-  const r = { id: uid(), name:'', category:cat, standards:[{id:uid(), name:''}], ingredients:[], prep:[], steps:[] };
-  DATA.push(r); persist();
-  VIEW.page='detail'; VIEW.recipeId=r.id; VIEW.mode='edit';
-  renderDetail();
-}
-function goHome(){ VIEW.page='home'; VIEW.recipeId=null; renderHome(); }
-function switchMode(mode){ VIEW.mode = mode; renderDetail(); }
-
-/* ============ 레시피 상세/편집 메인 렌더러 ============ */
-function renderDetail(){
-  const r = findRecipe(VIEW.recipeId);
-  if(!r){ goHome(); return; }
-
-  if(VIEW.mode === 'view') {
-    renderViewMode(r);
-  } else {
-    renderEditMode(r);
-  }
-}
-
-/* ------------ 1. 읽기 전용 레시피 화면 (제조 시 활용) ------------ */
-function renderViewMode(r){
-  const shell = document.getElementById('shell');
-
-  const stdHeaders = r.standards.map(s=>`
-    <th style="text-align:right;">${escapeHtml(s.name || '배합')}</th>
-  `).join('');
-
-  const rows = r.ingredients.map(ing=>`
-    <tr>
-      <td style="font-weight:600;">${escapeHtml(ing.name)}</td>
-      ${r.standards.map(s=>{
-        const val = ing.amounts?.[s.id] ?? '';
-        const formatted = formatAmount(val);
-        const unit = (formatted && !isNaN(val.trim())) ? 'g' : '';
-        return `<td class="amtcol">${escapeHtml(formatted)}${unit}</td>`;
-      }).join('')}
-      <td class="notecol">${escapeHtml(ing.note||'')}</td>
-    </tr>
-  `).join('');
-
-  const prepHtml = r.prep.map(p=>`
-    <li><span style="color:var(--accent);">•</span> <span>${escapeHtml(p)}</span></li>
-  `).join('');
-
-  const stepsHtml = r.steps.map((s,i)=>`
-    <li><span class="num">${i+1}.</span> <span>${escapeHtml(s)}</span></li>
-  `).join('');
-
-  shell.innerHTML = `
-    ${getBrandBarHtml()}
-
-    <div class="detailhead">
-      <div class="titlewrap">
-        <span class="category-badge">${escapeHtml(r.category || '기타')}</span>
-        <div class="productname-view">${escapeHtml(r.name || '(제품명 없음)')}</div>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="switchMode('edit')">✏️ 레시피 수정</button>
+    <!-- 레시피 상세/수정/추가 통합 모달 -->
+    <div id="recipeModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
+                <h3 id="modalTitle" class="text-lg font-bold text-slate-900">레시피 상세 정보</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div id="modalBody" class="p-6 space-y-6"></div>
+        </div>
     </div>
 
-    <div class="card">
-      <h2>배합표 <span class="tag">읽기 전용</span></h2>
-      <div class="view-table-wrap">
-        <table class="view-spec">
-          <thead>
-            <tr>
-              <th>재료명</th>
-              ${stdHeaders}
-              <th>비고</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows || `<tr><td colspan="${r.standards.length+2}" style="padding:20px;text-align:center;color:var(--ink-faint);">등록된 재료가 없습니다.</td></tr>`}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <!-- 스크립트 로직 -->
+    <script>
+        let recipes = [];
+        let currentCategory = '전체';
+        let currentRecipeId = null;
 
-    <div class="card">
-      <h2>준비 <span class="tag">사전 준비사항</span></h2>
-      <ul class="view-list">
-        ${prepHtml || `<li style="color:var(--ink-faint);">준비 항목이 없습니다.</li>`}
-      </ul>
-    </div>
+        const categories = ['전체', '빵', '쿠키', '케이크', '소스', '기타'];
 
-    <div class="card">
-      <h2>제조공정 <span class="tag">순서대로 진행</span></h2>
-      <ul class="view-list">
-        ${stepsHtml || `<li style="color:var(--ink-faint);">제조 공정이 없습니다.</li>`}
-      </ul>
-    </div>
+        window.addEventListener('firebase-ready', () => {
+            initCategoryUI();
+            loadRecipesFromFirebase();
+        });
 
-    <div class="bottomactions" style="justify-content:flex-end;">
-      <button class="btn btn-ghost" onclick="downloadExcel()">⬇ 엑셀 다운로드</button>
-    </div>
-  `;
-}
+        function initCategoryUI() {
+            const container = document.getElementById('categoryList');
+            container.innerHTML = categories.map(cat => `
+                <button onclick="selectCategory('${cat}')" id="cat-btn-${cat}" class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition ${cat === currentCategory ? 'bg-amber-50 text-amber-700 font-semibold' : 'text-slate-600 hover:bg-slate-50'}">
+                    ${cat}
+                </button>
+            `).join('');
+        }
 
-/* ------------ 2. 수정/편집 모드 화면 ------------ */
-function renderEditMode(r){
-  const shell = document.getElementById('shell');
+        function selectCategory(cat) {
+            currentCategory = cat;
+            initCategoryUI();
+            renderRecipes();
+        }
 
-  const stdHeaders = r.standards.map(s=>`
-    <th>
-      <div class="stdhead">
-        <input class="stdname mono" placeholder="예: 1개" value="${escapeHtml(s.name)}"
-          oninput="updateStdName('${s.id}', this.value)">
-        <button class="colremove" title="이 배합 기준 삭제" onclick="removeStd('${s.id}')">✕</button>
-      </div>
-    </th>`).join('');
+        function loadRecipesFromFirebase() {
+            const dbRef = window.FB_Ref(window.FB_DB, 'recipes');
+            window.FB_OnValue(dbRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    recipes = Object.keys(data).map(key => ({
+                        id: key,
+                        ...data[key]
+                    }));
+                } else {
+                    recipes = [];
+                }
+                renderRecipes();
+            });
+        }
 
-  const rows = r.ingredients.map(ing=>`
-    <tr>
-      <td class="namecol">
-        <input class="cellname" value="${escapeHtml(ing.name)}" placeholder="재료명"
-          oninput="updateIngName('${ing.id}', this.value)">
-      </td>
-      ${r.standards.map(s=>`
-        <td>
-          <div class="amtwrap">
-            <input class="cellamt" placeholder="0" value="${escapeHtml(ing.amounts?.[s.id] ?? '')}"
-              oninput="updateAmount('${ing.id}','${s.id}', this.value)">
-            <span class="gsuffix">g</span>
-          </div>
-        </td>`).join('')}
-      <td>
-        <input class="cellnote" value="${escapeHtml(ing.note||'')}" placeholder="비고"
-          oninput="updateIngNote('${ing.id}', this.value)">
-      </td>
-      <td><button class="rowremove" title="재료 삭제" onclick="removeIngredient('${ing.id}')">✕</button></td>
-    </tr>`).join('');
+        function renderRecipes() {
+            const keyword = document.getElementById('searchInput').value.toLowerCase();
+            const container = document.getElementById('recipeContainer');
 
-  const prepHtml = r.prep.map((p,i)=>`
-    <div class="item-row">
-      <div class="bullet">•</div>
-      <textarea rows="1" oninput="autoGrow(this); updatePrep(${i}, this.value)">${escapeHtml(p)}</textarea>
-      <button class="item-remove" onclick="removePrep(${i})">✕</button>
-    </div>`).join('');
+            const filtered = recipes.filter(r => {
+                const matchCategory = currentCategory === '전체' || r.category === currentCategory;
+                const matchKeyword = r.name.toLowerCase().includes(keyword) || (r.ingredients && r.ingredients.some(i => i.name.toLowerCase().includes(keyword)));
+                return matchCategory && matchKeyword;
+            });
 
-  const stepsHtml = r.steps.map((s,i)=>`
-    <div class="item-row">
-      <div class="bullet mono">${i+1}</div>
-      <textarea rows="1" oninput="autoGrow(this); updateStep(${i}, this.value)">${escapeHtml(s)}</textarea>
-      <button class="item-remove" onclick="removeStep(${i})">✕</button>
-    </div>`).join('');
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full py-16 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                        <i class="fa-solid fa-folder-open text-4xl mb-3 text-slate-300"></i>
+                        <p class="text-sm font-medium text-slate-600">등록된 레시피가 없습니다.</p>
+                        <p class="text-xs text-slate-400 mt-1">상단의 '새 레시피 추가' 버튼을 눌러 레시피를 직접 등록해보세요!</p>
+                    </div>
+                `;
+                return;
+            }
 
-  const catPickerHtml = CATEGORIES.map(c=>
-    `<button class="${r.category===c?'active':''}" onclick="setRecipeCategory('${c}')">${c}</button>`
-  ).join('');
+            container.innerHTML = filtered.map(r => `
+                <div onclick="openRecipeModal('${r.id}')" class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition cursor-pointer flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="px-2.5 py-0.5 bg-amber-50 text-amber-700 text-xs font-semibold rounded-full">${r.category}</span>
+                            <span class="text-xs text-slate-400">${r.yield || ''}</span>
+                        </div>
+                        <h3 class="text-base font-bold text-slate-900 mb-3">${r.name}</h3>
+                        <div class="space-y-1 text-xs text-slate-600 mb-4">
+                            ${(r.ingredients || []).slice(0, 3).map(i => `<div class="flex justify-between"><span>${i.name}</span><span class="font-medium">${i.amount}g</span></div>`).join('')}
+                            ${(r.ingredients || []).length > 3 ? `<div class="text-slate-400 text-right">+외 ${r.ingredients.length - 3}개 재료</div>` : ''}
+                        </div>
+                    </div>
+                    <div class="pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-400">
+                        <span>상세보기 및 수정</span>
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </div>
+                </div>
+            `).join('');
+        }
 
-  shell.innerHTML = `
-    ${getBrandBarHtml()}
+        function filterRecipes() {
+            renderRecipes();
+        }
 
-    <button class="backbtn" onclick="switchMode('view')">‹ 상세보기 모드로 돌아가기</button>
+        function openRecipeModal(id) {
+            currentRecipeId = id;
+            const r = recipes.find(item => item.id === id);
+            if (!r) return;
 
-    <div class="detailhead">
-      <div class="titlewrap">
-        <div class="fieldlabel">제품명</div>
-        <input class="productname" placeholder="제품명을 입력하세요" value="${escapeHtml(r.name)}" oninput="updateName(this.value)">
-        <div class="fieldlabel" style="margin-top:10px;">분류 선택</div>
-        <div class="catpicker">${catPickerHtml}</div>
-      </div>
-    </div>
+            document.getElementById('modalTitle').innerText = r.name;
+            document.getElementById('modalBody').innerHTML = `
+                <div>
+                    <span class="px-2.5 py-0.5 bg-amber-50 text-amber-700 text-xs font-semibold rounded-full">${r.category}</span>
+                    <p class="text-xs text-slate-500 mt-2">생산 기준: <span class="font-medium text-slate-700">${r.yield || '기준 없음'}</span></p>
+                </div>
+                <div>
+                    <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">배합표 (재료)</h4>
+                    <div class="bg-slate-50 rounded-lg p-3 space-y-1.5 border border-slate-100">
+                        ${(r.ingredients || []).map(i => `<div class="flex justify-between text-sm"><span class="text-slate-700">${i.name}</span><span class="font-semibold text-slate-900">${i.amount}g</span></div>`).join('')}
+                    </div>
+                </div>
+                <div>
+                    <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">제조 공정</h4>
+                    <div class="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 whitespace-pre-line border border-slate-100">${r.process || '공정 내용이 없습니다.'}</div>
+                </div>
+                <div class="flex justify-between pt-4 border-t border-slate-100">
+                    <button onclick="deleteRecipe('${r.id}')" class="text-rose-600 hover:text-rose-700 text-sm font-medium flex items-center gap-1.5">
+                        <i class="fa-solid fa-trash"></i> 삭제
+                    </button>
+                    <div class="flex gap-2">
+                        <button onclick="openEditModal('${r.id}')" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-pen"></i> 수정
+                        </button>
+                        <button onclick="closeModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition">
+                            닫기
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('recipeModal').classList.remove('hidden');
+        }
 
-    <div class="card">
-      <h2>배합표 <div class="h2actions">
-        <button class="btn btn-ghost btn-sm" onclick="addStandard()">＋ 배합 추가</button>
-      </div></h2>
-      <div class="tablewrap">
-        <table class="spec">
-          <thead>
-            <tr>
-              <th class="namecol">재료명</th>
-              ${stdHeaders}
-              <th>비고</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>${rows || `<tr><td colspan="${r.standards.length+3}" style="padding:20px;color:var(--ink-faint);">아직 재료가 없어요. 아래에서 추가해보세요.</td></tr>`}</tbody>
-        </table>
-      </div>
-      <div class="tableaddrow">
-        <button class="btn btn-ghost btn-sm" onclick="addIngredient()">＋ 재료 추가</button>
-      </div>
-    </div>
+        function openAddModal() {
+            currentRecipeId = null;
+            document.getElementById('modalTitle').innerText = '새 레시피 추가';
+            document.getElementById('modalBody').innerHTML = getRecipeFormHTML();
+            document.getElementById('recipeModal').classList.remove('hidden');
+        }
 
-    <div class="card">
-      <h2>준비 <span class="tag">사전 준비사항</span></h2>
-      <div class="itemlist">${prepHtml || `<div class="empty-state" style="padding:16px 4px;">준비 항목이 없어요.</div>`}</div>
-      <div class="additem"><button class="btn btn-ghost btn-sm" onclick="addPrep()">＋ 준비 항목 추가</button></div>
-    </div>
+        function openEditModal(id) {
+            const r = recipes.find(item => item.id === id);
+            if (!r) return;
 
-    <div class="card">
-      <h2>제조공정 <span class="tag">순서대로 진행</span></h2>
-      <div class="itemlist">${stepsHtml || `<div class="empty-state" style="padding:16px 4px;">공정 항목이 없어요.</div>`}</div>
-      <div class="additem"><button class="btn btn-ghost btn-sm" onclick="addStep()">＋ 공정 추가</button></div>
-    </div>
+            document.getElementById('modalTitle').innerText = '레시피 수정';
+            document.getElementById('modalBody').innerHTML = getRecipeFormHTML(r);
+            document.getElementById('recipeModal').classList.remove('hidden');
+        }
 
-    <div class="bottomactions">
-      <div class="left">
-        <button class="btn btn-danger" onclick="deleteRecipe()">레시피 삭제</button>
-      </div>
-      <div class="right">
-        <button class="btn btn-ok" onclick="manualSave()">완료 및 저장</button>
-      </div>
-    </div>
-  `;
-  shell.querySelectorAll('textarea').forEach(autoGrow);
-}
+        function getRecipeFormHTML(r = {}) {
+            const ingredientsText = (r.ingredients || []).map(i => `${i.name}:${i.amount}`).join('\n');
+            return `
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">제품명</label>
+                        <input type="text" id="formName" value="${r.name || ''}" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="예: 소금빵">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">카테고리</label>
+                        <select id="formCategory" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+                            ${categories.filter(c => c !== '전체').map(c => `<option value="${c}" ${r.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">생산 기준 (수량/배합)</label>
+                        <input type="text" id="formYield" value="${r.yield || ''}" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="예: 20개 분량">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">재료 (이름:용량(g) 형식으로 줄바꿈 입력)</label>
+                        <textarea id="formIngredients" rows="4" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="강력분:1000&#10;설탕:100">${ingredientsText}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">제조 공정</label>
+                        <textarea id="formProcess" rows="4" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="1. 반죽하기&#10;2. 휴지하기">${r.process || ''}</textarea>
+                    </div>
+                    <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
+                        <button onclick="closeModal()" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium">취소</button>
+                        <button onclick="saveRecipeData()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium">저장하기</button>
+                    </div>
+                </div>
+            `;
+        }
 
-function autoGrow(el){ el.style.height='auto'; el.style.height=(el.scrollHeight)+'px'; }
+        function saveRecipeData() {
+            const name = document.getElementById('formName').value.trim();
+            const category = document.getElementById('formCategory').value;
+            const yieldText = document.getElementById('formYield').value.trim();
+            const rawIngredients = document.getElementById('formIngredients').value.trim();
+            const process = document.getElementById('formProcess').value.trim();
 
-/* ---- 데이터 변경 헬퍼 ---- */
-function updateName(v){ currentRecipe().name = v; persist(); }
-function setRecipeCategory(cat){ currentRecipe().category = cat; persist(); renderDetail(); }
-function updateStdName(stdId, v){
-  const s = currentRecipe().standards.find(s=>s.id===stdId);
-  if(s){ s.name = v; persist(); }
-}
-function addStandard(){ currentRecipe().standards.push({id: uid(), name:''}); persist(); renderDetail(); }
-function removeStd(stdId){
-  const r = currentRecipe();
-  if(r.standards.length<=1){ toast('배합 기준은 최소 1개 이상 필요해요'); return; }
-  r.standards = r.standards.filter(s=>s.id!==stdId);
-  r.ingredients.forEach(ing=>{ if(ing.amounts) delete ing.amounts[stdId]; });
-  persist(); renderDetail();
-}
-function addIngredient(){ currentRecipe().ingredients.push({ id: uid(), name:'', amounts:{}, note:'' }); persist(); renderDetail(); }
-function removeIngredient(id){
-  const r = currentRecipe();
-  r.ingredients = r.ingredients.filter(i=>i.id!==id);
-  persist(); renderDetail();
-}
-function updateIngName(id, v){ const ing = currentRecipe().ingredients.find(i=>i.id===id); if(ing){ ing.name=v; persist(); } }
-function updateIngNote(id, v){ const ing = currentRecipe().ingredients.find(i=>i.id===id); if(ing){ ing.note=v; persist(); } }
-function updateAmount(ingId, stdId, v){
-  const ing = currentRecipe().ingredients.find(i=>i.id===ingId);
-  if(ing){ if(!ing.amounts) ing.amounts={}; ing.amounts[stdId]=v; persist(); }
-}
-function addPrep(){ currentRecipe().prep.push(''); persist(); renderDetail(); }
-function removePrep(i){ currentRecipe().prep.splice(i,1); persist(); renderDetail(); }
-function updatePrep(i,v){ currentRecipe().prep[i]=v; persist(); }
-function addStep(){ currentRecipe().steps.push(''); persist(); renderDetail(); }
-function removeStep(i){ currentRecipe().steps.splice(i,1); persist(); renderDetail(); }
-function updateStep(i,v){ currentRecipe().steps[i]=v; persist(); }
+            if (!name) {
+                alert('제품명을 입력해주세요.');
+                return;
+            }
 
-function manualSave(){ 
-  persist(); 
-  toast('저장되었습니다.'); 
-  switchMode('view');
-}
+            const ingredients = rawIngredients.split('\n').map(line => {
+                const parts = line.split(':');
+                if (parts.length === 2) {
+                    return { name: parts[0].trim(), amount: Number(parts[1].trim()) || 0 };
+                }
+                return null;
+            }).filter(i => i !== null);
 
-function deleteRecipe(){
-  const r = currentRecipe();
-  if(!confirm(`"${r.name}" 레시피를 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)) return;
-  DATA = DATA.filter(x=>x.id!==r.id);
-  persist();
-  goHome();
-  toast('레시피가 삭제되었습니다.');
-}
+            const recipeData = { name, category, yield: yieldText, ingredients, process };
 
-/* ---- 엑셀 다운로드 ---- */
-function downloadExcel(){
-  const r = currentRecipe();
-  const aoa = [];
-  aoa.push(['제품명', r.name]);
-  aoa.push([]);
-  aoa.push(['배합표']);
-  aoa.push(['재료명', ...r.standards.map(s=>s.name||'(기준명 미입력)'), '비고']);
-  r.ingredients.forEach(ing=>{
-    aoa.push([ing.name, ...r.standards.map(s=> {
-      const val = ing.amounts?.[s.id] ?? '';
-      return val ? `${formatAmount(val)}${!isNaN(val.trim()) ? 'g' : ''}` : '';
-    }), ing.note||'']);
-  });
-  aoa.push([]);
-  aoa.push(['준비']);
-  if(r.prep.length===0) aoa.push(['-']);
-  r.prep.forEach(p=> aoa.push([p]));
-  aoa.push([]);
-  aoa.push(['제조공정']);
-  if(r.steps.length===0) aoa.push(['-']);
-  r.steps.forEach((s,i)=> aoa.push([`${i+1}. ${s}`]));
+            if (currentRecipeId) {
+                const recipeRef = window.FB_Ref(window.FB_DB, `recipes/${currentRecipeId}`);
+                window.FB_Set(recipeRef, recipeData).then(() => {
+                    closeModal();
+                });
+            } else {
+                const newRef = window.FB_Push(window.FB_Ref(window.FB_DB, 'recipes'));
+                window.FB_Set(newRef, recipeData).then(() => {
+                    closeModal();
+                });
+            }
+        }
 
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:22}, ...r.standards.map(()=>({wch:12})), {wch:20}];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, (r.name || 'recipe').slice(0,28));
-  XLSX.writeFile(wb, `${r.name || '레시피'}.xlsx`);
-  toast('엑셀 파일을 다운로드했습니다.');
-}
+        function deleteRecipe(id) {
+            if (confirm('정말 이 레시피를 삭제하시겠습니까?')) {
+                window.FB_Remove(window.FB_Ref(window.FB_DB, `recipes/${id}`)).then(() => {
+                    closeModal();
+                });
+            }
+        }
 
-/* ============ 실행 ============ */
-function render(){ if(VIEW.page==='home') renderHome(); else renderDetail(); }
-render();
-</script>
+        function closeModal() {
+            document.getElementById('recipeModal').classList.add('hidden');
+        }
+
+        function exportToExcel() {
+            if (recipes.length === 0) {
+                alert('내보낼 레시피가 없습니다.');
+                return;
+            }
+            const data = recipes.map(r => ({
+                카테고리: r.category,
+                제품명: r.name,
+                생산기준: r.yield,
+                재료: (r.ingredients || []).map(i => `${i.name}(${i.amount}g)`).join(', '),
+                공정: r.process
+            }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "레시피목록");
+            XLSX.writeFile(wb, "하레하레_레시피.xlsx");
+        }
+    </script>
 </body>
 </html>
