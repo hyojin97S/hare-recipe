@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -363,7 +362,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                         <div>
                             <label class="block text-xs font-semibold text-slate-500 mb-1">제품명</label>
-                            <input type="text" id="formName" value="${r.name || ''}" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none" placeholder="">
+                            <input type="text" id="formName" lang="ko" value="${r.name || ''}" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none" placeholder="">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-500 mb-1">카테고리</label>
@@ -453,7 +452,7 @@
         }
 
         // 백업된 데이터를 기반으로 테이블을 다시 깔끔하게 그려주는 함수 (데이터 유실 방지)
-        function rebuildTableWithData(savedData) {
+        function rebuildTableWithData(savedData, focusTarget = null) {
             const headerContainer = document.getElementById('formColumnsHeader');
             const ingredientContainer = document.getElementById('formIngredientRows');
             
@@ -464,23 +463,41 @@
             const gridClass = getGridColsClass(cols.length);
             headerContainer.className = `col-span-7 grid ${gridClass} gap-2`;
 
+            let lastColInput = null;
             // 배합 헤더 생성
-            cols.forEach(colTitle => {
+            cols.forEach((colTitle, index) => {
                 const colId = 'form-col-' + Math.random().toString(36).substr(2, 9);
                 const colHeaderDiv = document.createElement('div');
                 colHeaderDiv.id = 'header-' + colId;
                 colHeaderDiv.className = 'flex items-center gap-1 bg-white/90 px-2 py-1 rounded border border-amber-300 col-header-item shadow-xs';
-                colHeaderDiv.innerHTML = `
-                    <input type="text" value="${colTitle}" class="col-title-input w-full bg-transparent text-center text-xs font-bold text-amber-900 focus:outline-none">
-                    <button type="button" onclick="removeFormColumn('${colId}')" class="text-slate-400 hover:text-rose-600 px-1"><i class="fa-solid fa-xmark text-xs"></i></button>
-                `;
+                
+                const inputElem = document.createElement('input');
+                inputElem.type = 'text';
+                inputElem.lang = 'ko';
+                inputElem.value = colTitle;
+                inputElem.className = 'col-title-input w-full bg-transparent text-center text-xs font-bold text-amber-900 focus:outline-none';
+                
+                if (focusTarget === 'new-col' && index === cols.length - 1) {
+                    lastColInput = inputElem;
+                }
+
+                colHeaderDiv.appendChild(inputElem);
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.onclick = () => removeFormColumn(colId);
+                removeBtn.className = 'text-slate-400 hover:text-rose-600 px-1';
+                removeBtn.innerHTML = '<i class="fa-solid fa-xmark text-xs"></i>';
+                colHeaderDiv.appendChild(removeBtn);
+
                 headerContainer.appendChild(colHeaderDiv);
             });
 
             // 재료 행 생성
             const rows = savedData.ingredients.length > 0 ? savedData.ingredients : [{ name: '', values: new Array(cols.length).fill(''), memo: '' }];
 
-            rows.forEach(ing => {
+            let lastIngNameInput = null;
+            rows.forEach((ing, rowIndex) => {
                 const rowId = 'ing-row-' + Math.random().toString(36).substr(2, 9);
                 const rowDiv = document.createElement('div');
                 rowDiv.id = rowId;
@@ -497,38 +514,76 @@
                     `;
                 }
 
-                rowDiv.innerHTML = `
-                    <div class="col-span-3 pl-1">
-                        <input type="text" placeholder="재료명" value="${ing.name || ''}" class="ing-name-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-amber-500">
-                    </div>
-                    <div class="ingredient-inputs-container col-span-7 grid ${gridClass} gap-2">
-                        ${inputsHtml}
-                    </div>
-                    <div class="col-span-2 flex items-center gap-1.5 pl-1">
-                        <input type="text" placeholder="비고" value="${ing.memo || ''}" class="ing-memo-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500">
-                        <button type="button" onclick="document.getElementById('${rowId}').remove()" class="text-slate-400 hover:text-rose-600 transition p-1 shrink-0">
-                            <i class="fa-solid fa-xmark"></i>
-                        </button>
-                    </div>
-                `;
+                const col3Div = document.createElement('div');
+                col3Div.className = 'col-span-3 pl-1';
+                
+                const nameInput = document.createElement('input');
+                nameInput.type = 'text';
+                nameInput.lang = 'ko';
+                nameInput.placeholder = '재료명';
+                nameInput.value = ing.name || '';
+                nameInput.className = 'ing-name-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-amber-500';
+
+                if (focusTarget === 'new-row' && rowIndex === rows.length - 1) {
+                    lastIngNameInput = nameInput;
+                }
+                col3Div.appendChild(nameInput);
+
+                const col7Div = document.createElement('div');
+                col7Div.className = `ingredient-inputs-container col-span-7 grid ${gridClass} gap-2`;
+                col7Div.innerHTML = inputsHtml;
+
+                const col2Div = document.createElement('div');
+                col2Div.className = 'col-span-2 flex items-center gap-1.5 pl-1';
+                
+                const memoInput = document.createElement('input');
+                memoInput.type = 'text';
+                memoInput.lang = 'ko';
+                memoInput.placeholder = '비고';
+                memoInput.value = ing.memo || '';
+                memoInput.className = 'ing-memo-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500';
+                
+                const delBtn = document.createElement('button');
+                delBtn.type = 'button';
+                delBtn.onclick = () => document.getElementById(rowId).remove();
+                delBtn.className = 'text-slate-400 hover:text-rose-600 transition p-1 shrink-0';
+                delBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+
+                col2Div.appendChild(memoInput);
+                col2Div.appendChild(delBtn);
+
+                rowDiv.appendChild(col3Div);
+                rowDiv.appendChild(col7Div);
+                rowDiv.appendChild(col2Div);
+
                 ingredientContainer.appendChild(rowDiv);
             });
+
+            // 새로 추가된 요소에 포커스를 주어 한글 입력기(IME)가 곧바로 활성화되도록 설정
+            setTimeout(() => {
+                if (focusTarget === 'new-col' && lastColInput) {
+                    lastColInput.focus();
+                    lastColInput.select();
+                } else if (focusTarget === 'new-row' && lastIngNameInput) {
+                    lastIngNameInput.focus();
+                    lastIngNameInput.select();
+                }
+            }, 10);
         }
 
-        // '배합 추가' 버튼 클릭 시: 열이 1개 늘어나면서 기존 데이터 완벽 유지
+        // '배합 추가' 버튼 클릭 시
         function addFormColumn(specificTitle = '') {
             const currentData = captureCurrentTableData();
             if (currentData.columns.length === 0) {
                 currentData.columns.push(specificTitle || '배합');
             } else {
                 currentData.columns.push(specificTitle || `배합 ${currentData.columns.length + 1}`);
-                // 새로운 배합 열이 생겼으므로 각 재료 행의 값 배열에도 빈 값 추가
                 currentData.ingredients.forEach(ing => {
                     if (!ing.values) ing.values = [];
                     ing.values.push('');
                 });
             }
-            rebuildTableWithData(currentData);
+            rebuildTableWithData(currentData, specificTitle ? null : 'new-col');
         }
 
         function removeFormColumn(colId) {
@@ -538,7 +593,6 @@
                 return;
             }
 
-            // 어떤 열이 삭제되었는지 찾기 위해 헤더 DOM 요소들 확인
             const headerContainer = document.getElementById('formColumnsHeader');
             const colHeaders = Array.from(headerContainer.querySelectorAll('.col-header-item'));
             const targetHeader = document.getElementById('header-' + colId);
@@ -556,7 +610,7 @@
             rebuildTableWithData(currentData);
         }
 
-        // '재료 추가' 버튼 클릭 시: 행이 1개 늘어나면서 기존 데이터 완벽 유지
+        // '재료 추가' 버튼 클릭 시
         function addIngredientRow(name = '', values = [], memo = '') {
             const currentData = captureCurrentTableData();
             if (currentData.columns.length === 0) {
@@ -566,7 +620,7 @@
             const defaultValues = values.length > 0 ? values : new Array(currentData.columns.length).fill('');
             currentData.ingredients.push({ name, values: defaultValues, memo });
 
-            rebuildTableWithData(currentData);
+            rebuildTableWithData(currentData, name ? null : 'new-row');
         }
 
         function addPrepRow(text = '') {
@@ -575,14 +629,31 @@
             const rowDiv = document.createElement('div');
             rowDiv.id = rowId;
             rowDiv.className = 'flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100';
-            rowDiv.innerHTML = `
-                <span class="text-amber-600 font-bold text-xs pl-1">•</span>
-                <input type="text" placeholder="준비 사항 입력..." value="${text}" class="prep-input flex-grow px-3 py-1.5 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500">
-                <button type="button" onclick="document.getElementById('${rowId}').remove()" class="text-slate-400 hover:text-rose-600 px-2 transition">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            `;
+            
+            const inputElem = document.createElement('input');
+            inputElem.type = 'text';
+            inputElem.lang = 'ko';
+            inputElem.placeholder = '준비 사항 입력...';
+            inputElem.value = text;
+            inputElem.className = 'prep-input flex-grow px-3 py-1.5 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500';
+
+            rowDiv.innerHTML = `<span class="text-amber-600 font-bold text-xs pl-1">•</span>`;
+            rowDiv.appendChild(inputElem);
+            
+            const delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.onclick = () => document.getElementById(rowId).remove();
+            delBtn.className = 'text-slate-400 hover:text-rose-600 px-2 transition';
+            delBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+            rowDiv.appendChild(delBtn);
+
             container.appendChild(rowDiv);
+
+            if (!text) {
+                setTimeout(() => {
+                    inputElem.focus();
+                }, 10);
+            }
         }
 
         function addProcessRow(text = '') {
@@ -592,14 +663,31 @@
             const rowDiv = document.createElement('div');
             rowDiv.id = rowId;
             rowDiv.className = 'flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100';
-            rowDiv.innerHTML = `
-                <span class="proc-num bg-amber-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0">${rowCount}</span>
-                <input type="text" placeholder="공정 내용 입력..." value="${text}" class="proc-input flex-grow px-3 py-1.5 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500">
-                <button type="button" onclick="document.getElementById('${rowId}').remove(); updateProcessNumbers();" class="text-slate-400 hover:text-rose-600 px-2 transition">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            `;
+            
+            const inputElem = document.createElement('input');
+            inputElem.type = 'text';
+            inputElem.lang = 'ko';
+            inputElem.placeholder = '공정 내용 입력...';
+            inputElem.value = text;
+            inputElem.className = 'proc-input flex-grow px-3 py-1.5 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500';
+
+            rowDiv.innerHTML = `<span class="proc-num bg-amber-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0">${rowCount}</span>`;
+            rowDiv.appendChild(inputElem);
+
+            const delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.onclick = () => { document.getElementById(rowId).remove(); updateProcessNumbers(); };
+            delBtn.className = 'text-slate-400 hover:text-rose-600 px-2 transition';
+            delBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+            rowDiv.appendChild(delBtn);
+
             container.appendChild(rowDiv);
+
+            if (!text) {
+                setTimeout(() => {
+                    inputElem.focus();
+                }, 10);
+            }
         }
 
         function updateProcessNumbers() {
