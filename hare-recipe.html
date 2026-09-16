@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -313,9 +314,8 @@
             document.getElementById('recipeModal').classList.remove('hidden');
             
             setTimeout(() => {
-                // 이미지와 같이 배합 1칸, 빈 재료 1줄, 빈 준비 1줄, 빈 공정 1줄 기본 세팅
+                // 배합 1 기본 세팅 (재료 입력줄은 빈 상태로 시작)
                 addFormColumn('배합 1');
-                addIngredientRow('', [], '');
                 addPrepRow('');
                 addProcessRow('');
             }, 50);
@@ -339,8 +339,6 @@
 
                 if (r.ingredients && r.ingredients.length > 0) {
                     r.ingredients.forEach(i => addIngredientRow(i.name, i.values, i.memo));
-                } else {
-                    addIngredientRow('', [], '');
                 }
 
                 if (r.preparations && r.preparations.length > 0) {
