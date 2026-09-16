@@ -228,7 +228,7 @@
             const r = recipes.find(item => item.id === id);
             if (!r) return;
 
-            const cols = r.columns || ['배합 1'];
+            const cols = r.columns || ['배합'];
             const gridClass = getGridColsClass(cols.length);
 
             document.getElementById('modalTitle').innerText = `레시피 카드 - ${r.name}`;
@@ -314,8 +314,8 @@
             document.getElementById('recipeModal').classList.remove('hidden');
             
             setTimeout(() => {
-                // 배합 1 기본 세팅 (재료 입력줄은 빈 상태로 시작)
-                addFormColumn('배합 1');
+                addFormColumn();
+                addIngredientRow();
                 addPrepRow('');
                 addProcessRow('');
             }, 50);
@@ -334,11 +334,13 @@
                 if (r.columns && r.columns.length > 0) {
                     r.columns.forEach(c => addFormColumn(c));
                 } else {
-                    addFormColumn('배합 1');
+                    addFormColumn('배합');
                 }
 
                 if (r.ingredients && r.ingredients.length > 0) {
                     r.ingredients.forEach(i => addIngredientRow(i.name, i.values, i.memo));
+                } else {
+                    addIngredientRow();
                 }
 
                 if (r.preparations && r.preparations.length > 0) {
@@ -377,7 +379,7 @@
                             <h4 class="font-bold text-slate-900 text-sm flex items-center gap-2">
                                 <i class="fa-solid fa-scale-balanced text-amber-600"></i> 배합표
                             </h4>
-                            <button type="button" onclick="addFormColumn('배합 2')" class="bg-[#C29B38] hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
+                            <button type="button" onclick="addFormColumn()" class="bg-[#C29B38] hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
                                 <i class="fa-solid fa-plus"></i> 배합 추가
                             </button>
                         </div>
@@ -429,57 +431,64 @@
             `;
         }
 
-        function addFormColumn(title = '배합 2') {
-            const colId = 'form-col-' + Math.random().toString(36).substr(2, 9);
-            
-            const headerContainer = document.getElementById('formColumnsHeader');
-            const colHeaderDiv = document.createElement('div');
-            colHeaderDiv.id = 'header-' + colId;
-            colHeaderDiv.className = 'flex items-center gap-1 bg-white/80 p-1 rounded border border-amber-300 col-header-item';
-            colHeaderDiv.innerHTML = `
-                <input type="text" value="${title}" class="col-title-input w-full bg-transparent text-center text-xs font-bold text-amber-900 focus:outline-none">
-                <button type="button" onclick="removeFormColumn('${colId}')" class="text-slate-400 hover:text-rose-600 px-1"><i class="fa-solid fa-xmark text-xs"></i></button>
-            `;
-            headerContainer.appendChild(colHeaderDiv);
+        // 현재 입력되어 있는 모든 데이터를 백업하는 함수
+        function captureCurrentTableData() {
+            const columns = [];
+            document.querySelectorAll('.col-title-input').forEach(input => {
+                columns.push(input.value);
+            });
 
-            updateAllRowsGridStructure();
+            const ingredients = [];
+            document.querySelectorAll('.ingredient-row-item').forEach(row => {
+                const name = row.querySelector('.ing-name-input').value;
+                const memo = row.querySelector('.ing-memo-input').value;
+                const values = [];
+                row.querySelectorAll('.ing-val-input').forEach(input => {
+                    values.push(input.value);
+                });
+                ingredients.push({ name, values, memo });
+            });
+
+            return { columns, ingredients };
         }
 
-        function removeFormColumn(colId) {
+        // 백업된 데이터를 기반으로 테이블을 다시 깔끔하게 그려주는 함수 (데이터 유실 방지)
+        function rebuildTableWithData(savedData) {
             const headerContainer = document.getElementById('formColumnsHeader');
-            const colHeaders = headerContainer.querySelectorAll('.col-header-item');
+            const ingredientContainer = document.getElementById('formIngredientRows');
             
-            if (colHeaders.length <= 1) {
-                alert('최소 1개의 배합 칸은 유지되어야 합니다.');
-                return;
-            }
+            headerContainer.innerHTML = '';
+            ingredientContainer.innerHTML = '';
 
-            const headerEl = document.getElementById('header-' + colId);
-            if (!headerEl) return;
-            headerEl.remove();
-
-            updateAllRowsGridStructure();
-        }
-
-        function updateAllRowsGridStructure() {
-            const headerContainer = document.getElementById('formColumnsHeader');
-            const colHeaders = headerContainer.querySelectorAll('.col-header-item');
-            const currentColsCount = colHeaders.length > 0 ? colHeaders.length : 1;
-            const gridClass = getGridColsClass(currentColsCount);
-
+            const cols = savedData.columns.length > 0 ? savedData.columns : ['배합'];
+            const gridClass = getGridColsClass(cols.length);
             headerContainer.className = `col-span-7 grid ${gridClass} gap-2`;
 
-            const rows = document.querySelectorAll('.ingredient-row-item');
-            rows.forEach(row => {
-                const inputsContainer = row.querySelector('.ingredient-inputs-container');
-                inputsContainer.className = `col-span-7 grid ${gridClass} gap-2`;
-                
-                const existingInputs = inputsContainer.querySelectorAll('.ing-val-input');
-                const values = Array.from(existingInputs).map(inp => inp.value);
+            // 배합 헤더 생성
+            cols.forEach(colTitle => {
+                const colId = 'form-col-' + Math.random().toString(36).substr(2, 9);
+                const colHeaderDiv = document.createElement('div');
+                colHeaderDiv.id = 'header-' + colId;
+                colHeaderDiv.className = 'flex items-center gap-1 bg-white/90 px-2 py-1 rounded border border-amber-300 col-header-item shadow-xs';
+                colHeaderDiv.innerHTML = `
+                    <input type="text" value="${colTitle}" class="col-title-input w-full bg-transparent text-center text-xs font-bold text-amber-900 focus:outline-none">
+                    <button type="button" onclick="removeFormColumn('${colId}')" class="text-slate-400 hover:text-rose-600 px-1"><i class="fa-solid fa-xmark text-xs"></i></button>
+                `;
+                headerContainer.appendChild(colHeaderDiv);
+            });
 
+            // 재료 행 생성
+            const rows = savedData.ingredients.length > 0 ? savedData.ingredients : [{ name: '', values: new Array(cols.length).fill(''), memo: '' }];
+
+            rows.forEach(ing => {
+                const rowId = 'ing-row-' + Math.random().toString(36).substr(2, 9);
+                const rowDiv = document.createElement('div');
+                rowDiv.id = rowId;
+                rowDiv.className = 'ingredient-row-item grid grid-cols-12 gap-2 items-center bg-slate-50/60 p-2 rounded-lg border border-slate-200';
+                
                 let inputsHtml = '';
-                for(let i = 0; i < currentColsCount; i++) {
-                    const val = (values[i] !== undefined) ? values[i] : '';
+                for(let i = 0; i < cols.length; i++) {
+                    const val = (ing.values && ing.values[i] !== undefined) ? ing.values[i] : '';
                     inputsHtml += `
                         <div class="flex items-center gap-1">
                             <input type="number" placeholder="0" value="${val}" class="ing-val-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-amber-500">
@@ -487,49 +496,77 @@
                         </div>
                     `;
                 }
-                inputsContainer.innerHTML = inputsHtml;
+
+                rowDiv.innerHTML = `
+                    <div class="col-span-3 pl-1">
+                        <input type="text" placeholder="재료명" value="${ing.name || ''}" class="ing-name-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-amber-500">
+                    </div>
+                    <div class="ingredient-inputs-container col-span-7 grid ${gridClass} gap-2">
+                        ${inputsHtml}
+                    </div>
+                    <div class="col-span-2 flex items-center gap-1.5 pl-1">
+                        <input type="text" placeholder="비고" value="${ing.memo || ''}" class="ing-memo-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500">
+                        <button type="button" onclick="document.getElementById('${rowId}').remove()" class="text-slate-400 hover:text-rose-600 transition p-1 shrink-0">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                `;
+                ingredientContainer.appendChild(rowDiv);
             });
         }
 
-        function addIngredientRow(name = '', values = [], memo = '') {
-            const container = document.getElementById('formIngredientRows');
-            const rowId = 'ing-row-' + Math.random().toString(36).substr(2, 9);
-            
-            const headerContainer = document.getElementById('formColumnsHeader');
-            const colHeaders = headerContainer.querySelectorAll('.col-header-item');
-            const colLen = colHeaders.length > 0 ? colHeaders.length : 1;
-            const gridClass = getGridColsClass(colLen);
+        // '배합 추가' 버튼 클릭 시: 열이 1개 늘어나면서 기존 데이터 완벽 유지
+        function addFormColumn(specificTitle = '') {
+            const currentData = captureCurrentTableData();
+            if (currentData.columns.length === 0) {
+                currentData.columns.push(specificTitle || '배합');
+            } else {
+                currentData.columns.push(specificTitle || `배합 ${currentData.columns.length + 1}`);
+                // 새로운 배합 열이 생겼으므로 각 재료 행의 값 배열에도 빈 값 추가
+                currentData.ingredients.forEach(ing => {
+                    if (!ing.values) ing.values = [];
+                    ing.values.push('');
+                });
+            }
+            rebuildTableWithData(currentData);
+        }
 
-            const rowDiv = document.createElement('div');
-            rowDiv.id = rowId;
-            rowDiv.className = 'ingredient-row-item grid grid-cols-12 gap-2 items-center bg-slate-50/60 p-2 rounded-lg border border-slate-200';
-            
-            let inputsHtml = '';
-            for(let i = 0; i < colLen; i++) {
-                const val = (values && values[i] !== undefined) ? values[i] : '';
-                inputsHtml += `
-                    <div class="flex items-center gap-1">
-                        <input type="number" placeholder="0" value="${val}" class="ing-val-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-amber-500">
-                        <span class="text-xs text-slate-500">g</span>
-                    </div>
-                `;
+        function removeFormColumn(colId) {
+            const currentData = captureCurrentTableData();
+            if (currentData.columns.length <= 1) {
+                alert('최소 1개의 배합 칸은 유지되어야 합니다.');
+                return;
             }
 
-            rowDiv.innerHTML = `
-                <div class="col-span-3 pl-1">
-                    <input type="text" placeholder="재료명" value="${name}" class="ing-name-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-amber-500">
-                </div>
-                <div class="ingredient-inputs-container col-span-7 grid ${gridClass} gap-2">
-                    ${inputsHtml}
-                </div>
-                <div class="col-span-2 flex items-center gap-1.5 pl-1">
-                    <input type="text" placeholder="비고" value="${memo}" class="ing-memo-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500">
-                    <button type="button" onclick="document.getElementById('${rowId}').remove()" class="text-slate-400 hover:text-rose-600 transition p-1 shrink-0">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
-                </div>
-            `;
-            container.appendChild(rowDiv);
+            // 어떤 열이 삭제되었는지 찾기 위해 헤더 DOM 요소들 확인
+            const headerContainer = document.getElementById('formColumnsHeader');
+            const colHeaders = Array.from(headerContainer.querySelectorAll('.col-header-item'));
+            const targetHeader = document.getElementById('header-' + colId);
+            const removeIdx = colHeaders.indexOf(targetHeader);
+
+            if (removeIdx > -1) {
+                currentData.columns.splice(removeIdx, 1);
+                currentData.ingredients.forEach(ing => {
+                    if (ing.values) {
+                        ing.values.splice(removeIdx, 1);
+                    }
+                });
+            }
+
+            rebuildTableWithData(currentData);
+        }
+
+        // '재료 추가' 버튼 클릭 시: 행이 1개 늘어나면서 기존 데이터 완벽 유지
+        function addIngredientRow(name = '', values = [], memo = '') {
+            const currentData = captureCurrentTableData();
+            if (currentData.columns.length === 0) {
+                currentData.columns.push('배합');
+            }
+
+            const defaultValues = values.length > 0 ? values : new Array(currentData.columns.length).fill('');
+            currentData.ingredients.push({ name, values: defaultValues, memo });
+
+            rebuildTableWithData(currentData);
         }
 
         function addPrepRow(text = '') {
