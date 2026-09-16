@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>하레하레 레시피 관리</title>
+    <title>하레하레 스마트 레시피 카드</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- SheetJS (Excel Export) -->
@@ -47,18 +46,18 @@
         body { font-family: 'Pretendard', sans-serif; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+<body class="bg-amber-50/30 text-slate-800 min-h-screen flex flex-col">
 
     <!-- 상단 헤더 -->
     <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="flex items-center gap-3">
-                <div class="bg-amber-500 text-white p-2.5 rounded-xl shadow-md">
+                <div class="bg-amber-600 text-white p-2.5 rounded-xl shadow-md">
                     <i class="fa-solid fa-bread-slice text-xl"></i>
                 </div>
                 <div>
-                    <h1 class="text-xl font-bold tracking-tight text-slate-900">하레하레 레시피</h1>
-                    <p class="text-xs text-slate-500">실시간 공유 베이커리/카페 레시피 관리 시스템</p>
+                    <h1 class="text-xl font-bold tracking-tight text-slate-900">하레하레 레시피 시스템</h1>
+                    <p class="text-xs text-slate-500">배합표 및 공정 관리 실시간 공유</p>
                 </div>
             </div>
             
@@ -94,17 +93,17 @@
             </div>
         </aside>
 
-        <!-- 우측: 레시피 목록 및 상세 뷰 -->
+        <!-- 우측: 레시피 목록 -->
         <section class="lg:col-span-3 space-y-4">
             <div id="recipeContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
         </section>
     </main>
 
-    <!-- 레시피 상세/수정/추가 통합 모달 -->
+    <!-- 레시피 등록/수정/상세 모달 -->
     <div id="recipeModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 overflow-y-auto">
-        <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
-            <div class="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
-                <h3 id="modalTitle" class="text-lg font-bold text-slate-900">레시피 상세 정보</h3>
+        <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl border border-slate-200">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-20">
+                <h3 id="modalTitle" class="text-lg font-bold text-slate-900">레시피 카드</h3>
                 <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition">
                     <i class="fa-solid fa-xmark text-lg"></i>
                 </button>
@@ -120,6 +119,21 @@
         let currentRecipeId = null;
 
         const categories = ['전체', '빵', '쿠키', '케이크', '소스', '기타'];
+
+        // Tailwind 동적 클래스 누락 방지용 매핑 함수
+        function getGridColsClass(count) {
+            const map = {
+                1: 'grid-cols-1',
+                2: 'grid-cols-2',
+                3: 'grid-cols-3',
+                4: 'grid-cols-4',
+                5: 'grid-cols-5',
+                6: 'grid-cols-6',
+                7: 'grid-cols-7',
+                8: 'grid-cols-8'
+            };
+            return map[count] || 'grid-cols-4';
+        }
 
         window.addEventListener('firebase-ready', () => {
             initCategoryUI();
@@ -171,28 +185,31 @@
                 container.innerHTML = `
                     <div class="col-span-full py-16 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
                         <i class="fa-solid fa-folder-open text-4xl mb-3 text-slate-300"></i>
-                        <p class="text-sm font-medium text-slate-600">등록된 레시피가 없습니다.</p>
-                        <p class="text-xs text-slate-400 mt-1">상단의 '새 레시피 추가' 버튼을 눌러 레시피를 직접 등록해보세요!</p>
+                        <p class="text-sm font-medium text-slate-600">등록된 레시피 카드가 없습니다.</p>
+                        <p class="text-xs text-slate-400 mt-1">상단의 '새 레시피 추가' 버튼을 눌러 카드를 등록해보세요!</p>
                     </div>
                 `;
                 return;
             }
 
             container.innerHTML = filtered.map(r => `
-                <div onclick="openRecipeModal('${r.id}')" class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition cursor-pointer flex flex-col justify-between">
+                <div onclick="openRecipeDetailModal('${r.id}')" class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition cursor-pointer flex flex-col justify-between">
                     <div>
                         <div class="flex justify-between items-start mb-2">
                             <span class="px-2.5 py-0.5 bg-amber-50 text-amber-700 text-xs font-semibold rounded-full">${r.category}</span>
-                            <span class="text-xs text-slate-400">${r.yield || ''}</span>
+                            <span class="text-xs font-medium text-slate-500">배합 열 수: ${r.columns ? r.columns.length : 1}개</span>
                         </div>
-                        <h3 class="text-base font-bold text-slate-900 mb-3">${r.name}</h3>
-                        <div class="space-y-1 text-xs text-slate-600 mb-4">
-                            ${(r.ingredients || []).slice(0, 3).map(i => `<div class="flex justify-between"><span>${i.name}</span><span class="font-medium">${i.amount}g</span></div>`).join('')}
+                        <h3 class="text-base font-bold text-slate-900 mb-1">${r.name}</h3>
+                        <div class="space-y-1 text-xs text-slate-600 mb-4 border-t border-slate-100 pt-2">
+                            ${(r.ingredients || []).slice(0, 3).map(i => {
+                                const firstVal = i.values && i.values.length > 0 ? i.values[0] : 0;
+                                return `<div class="flex justify-between"><span>${i.name}</span><span class="font-medium">${firstVal}g</span></div>`;
+                            }).join('')}
                             ${(r.ingredients || []).length > 3 ? `<div class="text-slate-400 text-right">+외 ${r.ingredients.length - 3}개 재료</div>` : ''}
                         </div>
                     </div>
-                    <div class="pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-400">
-                        <span>상세보기 및 수정</span>
+                    <div class="pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-amber-600 font-medium">
+                        <span>레시피 카드 열기</span>
                         <i class="fa-solid fa-chevron-right text-[10px]"></i>
                     </div>
                 </div>
@@ -203,134 +220,431 @@
             renderRecipes();
         }
 
-        function openRecipeModal(id) {
+        // ==========================================
+        // 1. 레시피 상세 조회 모달
+        // ==========================================
+        function openRecipeDetailModal(id) {
             currentRecipeId = id;
             const r = recipes.find(item => item.id === id);
             if (!r) return;
 
-            document.getElementById('modalTitle').innerText = r.name;
+            const cols = r.columns || ['예: 1개'];
+            const gridClass = getGridColsClass(cols.length);
+
+            document.getElementById('modalTitle').innerText = `레시피 카드 - ${r.name}`;
             document.getElementById('modalBody').innerHTML = `
-                <div>
-                    <span class="px-2.5 py-0.5 bg-amber-50 text-amber-700 text-xs font-semibold rounded-full">${r.category}</span>
-                    <p class="text-xs text-slate-500 mt-2">생산 기준: <span class="font-medium text-slate-700">${r.yield || '기준 없음'}</span></p>
-                </div>
-                <div>
-                    <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">배합표 (재료)</h4>
-                    <div class="bg-slate-50 rounded-lg p-3 space-y-1.5 border border-slate-100">
-                        ${(r.ingredients || []).map(i => `<div class="flex justify-between text-sm"><span class="text-slate-700">${i.name}</span><span class="font-semibold text-slate-900">${i.amount}g</span></div>`).join('')}
+                <div class="space-y-6">
+                    <div class="flex justify-between items-center bg-amber-50/60 p-4 rounded-xl border border-amber-200">
+                        <div>
+                            <span class="text-xs font-semibold text-amber-800 uppercase">제품명</span>
+                            <h2 class="text-lg font-bold text-slate-900">${r.name}</h2>
+                        </div>
+                        <span class="px-3 py-1 bg-amber-100 text-amber-900 text-xs font-bold rounded-full">${r.category}</span>
                     </div>
-                </div>
-                <div>
-                    <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">제조 공정</h4>
-                    <div class="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 whitespace-pre-line border border-slate-100">${r.process || '공정 내용이 없습니다.'}</div>
-                </div>
-                <div class="flex justify-between pt-4 border-t border-slate-100">
-                    <button onclick="deleteRecipe('${r.id}')" class="text-rose-600 hover:text-rose-700 text-sm font-medium flex items-center gap-1.5">
-                        <i class="fa-solid fa-trash"></i> 삭제
-                    </button>
-                    <div class="flex gap-2">
-                        <button onclick="openEditModal('${r.id}')" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-1.5">
-                            <i class="fa-solid fa-pen"></i> 수정
+
+                    <!-- 배합표 -->
+                    <div class="bg-[#FDFBF7] p-5 rounded-2xl border border-amber-200/80 shadow-sm space-y-4">
+                        <h4 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                            <i class="fa-solid fa-scale-balanced text-amber-600"></i> 배합표
+                        </h4>
+                        
+                        <div class="bg-white rounded-xl border border-amber-200 overflow-hidden shadow-sm p-4 space-y-2">
+                            <!-- 헤더 -->
+                            <div class="grid grid-cols-12 gap-2 items-center bg-amber-100/60 p-2 rounded-lg border border-amber-200 text-xs font-bold text-slate-700">
+                                <div class="col-span-3 pl-2">재료명</div>
+                                <div class="col-span-7 grid ${gridClass} gap-2">
+                                    ${cols.map(c => `<div class="text-center truncate">${c}</div>`).join('')}
+                                </div>
+                                <div class="col-span-2 pl-2">비고</div>
+                            </div>
+                            <!-- 바디 -->
+                            <div class="space-y-1.5">
+                                ${(r.ingredients || []).map(i => `
+                                    <div class="grid grid-cols-12 gap-2 items-center bg-slate-50/50 p-2 rounded-lg border border-slate-100 text-xs">
+                                        <div class="col-span-3 font-semibold text-slate-800 pl-2">${i.name}</div>
+                                        <div class="col-span-7 grid ${gridClass} gap-2">
+                                            ${cols.map((_, idx) => `<div class="text-center font-bold text-amber-900">${i.values[idx] !== undefined && i.values[idx] !== '' ? i.values[idx] + 'g' : '-'}</div>`).join('')}
+                                        </div>
+                                        <div class="col-span-2 text-slate-500 pl-2 truncate">${i.memo || '-'}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 준비 섹션 -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
+                        <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider text-amber-800">준비 (사전 준비사항)</h4>
+                        <div class="text-xs text-slate-700 whitespace-pre-line leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            ${r.preparations && r.preparations.length > 0 ? r.preparations.map(p => `• ${p}`).join('\n') : '-'}
+                        </div>
+                    </div>
+
+                    <!-- 제조공정 섹션 -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
+                        <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider text-amber-800">제조공정 (순서대로 진행)</h4>
+                        <div class="text-xs text-slate-700 whitespace-pre-line leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            ${r.processes && r.processes.length > 0 ? r.processes.map((p, idx) => `${idx + 1}. ${p}`).join('\n') : '-'}
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between pt-4 border-t border-slate-100">
+                        <button onclick="deleteRecipe('${r.id}')" class="text-rose-600 hover:text-rose-700 text-sm font-medium flex items-center gap-1.5">
+                            <i class="fa-solid fa-trash"></i> 삭제하기
                         </button>
-                        <button onclick="closeModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition">
-                            닫기
-                        </button>
+                        <div class="flex gap-2">
+                            <button onclick="openEditModal('${r.id}')" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-pen"></i> 수정하기
+                            </button>
+                            <button onclick="closeModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition">
+                                닫기
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
             document.getElementById('recipeModal').classList.remove('hidden');
         }
 
+        // ==========================================
+        // 2. 레시피 추가 및 수정 모달
+        // ==========================================
         function openAddModal() {
             currentRecipeId = null;
-            document.getElementById('modalTitle').innerText = '새 레시피 추가';
+            document.getElementById('modalTitle').innerText = '새 레시피 카드 작성';
             document.getElementById('modalBody').innerHTML = getRecipeFormHTML();
             document.getElementById('recipeModal').classList.remove('hidden');
+            
+            setTimeout(() => {
+                addFormColumn('예: 1개');
+                addFormColumn('예: 1개');
+                
+                const defaultData = [
+                    { name: '호밀종(완성)', vals: [360, 0], memo: '' },
+                    { name: '호밀가루', vals: [720, 0], memo: '' },
+                    { name: '생이스트', vals: [3, 0], memo: '' },
+                    { name: '소금', vals: [27, 0], memo: '' },
+                    { name: '물(50°C)', vals: [1400, 0], memo: '1,2차 분할 투입' },
+                    { name: '글루텐', vals: [7, 0], memo: '' }
+                ];
+                defaultData.forEach(d => addIngredientRow(d.name, d.vals, d.memo));
+
+                addPrepRow('호밀종 3차 단계 사전 준비 (호밀종+T55+물)');
+                addProcessRow('호밀 특성에 맞춰 저속 미싱 후 틀 반주 후 고온 발효 굽기.');
+            }, 50);
         }
 
         function openEditModal(id) {
             const r = recipes.find(item => item.id === id);
             if (!r) return;
 
-            document.getElementById('modalTitle').innerText = '레시피 수정';
+            currentRecipeId = id;
+            document.getElementById('modalTitle').innerText = '레시피 카드 수정';
             document.getElementById('modalBody').innerHTML = getRecipeFormHTML(r);
             document.getElementById('recipeModal').classList.remove('hidden');
+
+            setTimeout(() => {
+                if (r.columns && r.columns.length > 0) {
+                    r.columns.forEach(c => addFormColumn(c));
+                } else {
+                    addFormColumn('예: 1개');
+                }
+
+                if (r.ingredients) {
+                    r.ingredients.forEach(i => addIngredientRow(i.name, i.values, i.memo));
+                }
+
+                if (r.preparations) {
+                    r.preparations.forEach(p => addPrepRow(p));
+                }
+
+                if (r.processes) {
+                    r.processes.forEach(p => addProcessRow(p));
+                }
+            }, 50);
         }
 
         function getRecipeFormHTML(r = {}) {
-            const ingredientsText = (r.ingredients || []).map(i => `${i.name}:${i.amount}`).join('\n');
             return `
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">제품명</label>
-                        <input type="text" id="formName" value="${r.name || ''}" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="예: 소금빵">
+                <div class="space-y-6 text-sm">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">제품명</label>
+                            <input type="text" id="formName" value="${r.name || ''}" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none" placeholder="예: 사워도우 호밀빵">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">카테고리</label>
+                            <select id="formCategory" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                                ${categories.filter(c => c !== '전체').map(c => `<option value="${c}" ${r.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+                            </select>
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">카테고리</label>
-                        <select id="formCategory" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
-                            ${categories.filter(c => c !== '전체').map(c => `<option value="${c}" ${r.category === c ? 'selected' : ''}>${c}</option>`).join('')}
-                        </select>
+
+                    <!-- 배합표 입력 섹션 -->
+                    <div class="bg-[#FDFBF7] p-4 sm:p-5 rounded-2xl border border-amber-200 shadow-sm space-y-3">
+                        <div class="flex justify-between items-center">
+                            <h4 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-scale-balanced text-amber-600"></i> 배합표
+                            </h4>
+                            <button type="button" onclick="addFormColumn('예: 1개')" class="bg-[#C29B38] hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
+                                <i class="fa-solid fa-plus"></i> 배합 추가
+                            </button>
+                        </div>
+
+                        <div class="bg-white rounded-xl border border-amber-200 overflow-hidden shadow-sm p-3 space-y-2">
+                            <!-- 완벽하게 정렬된 헤더 그리드 -->
+                            <div class="grid grid-cols-12 gap-2 items-center bg-amber-100/70 p-2 rounded-lg border border-amber-200 text-xs font-bold text-slate-700">
+                                <div class="col-span-3 pl-2">재료명</div>
+                                <div id="formColumnsHeader" class="col-span-7 grid grid-cols-1 gap-2"></div>
+                                <div class="col-span-2 pl-2">비고</div>
+                            </div>
+
+                            <!-- 동적 재료 행 리스트 -->
+                            <div id="formIngredientRows" class="space-y-2"></div>
+
+                            <!-- [+ 재료 추가] 버튼 -->
+                            <div class="pt-2">
+                                <button type="button" onclick="addIngredientRow()" class="w-full bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5">
+                                    <i class="fa-solid fa-plus"></i> 재료 추가
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">생산 기준 (수량/배합)</label>
-                        <input type="text" id="formYield" value="${r.yield || ''}" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="예: 20개 분량">
+
+                    <!-- 준비 섹션 -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                        <div class="flex justify-between items-center">
+                            <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider text-amber-800">준비 (사전 준비사항)</h4>
+                            <button type="button" onclick="addPrepRow()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1">
+                                <i class="fa-solid fa-plus"></i> 준비 항목 추가
+                            </button>
+                        </div>
+                        <div id="formPrepRows" class="space-y-2"></div>
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">재료 (이름:용량(g) 형식으로 줄바꿈 입력)</label>
-                        <textarea id="formIngredients" rows="4" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="강력분:1000&#10;설탕:100">${ingredientsText}</textarea>
+
+                    <!-- 제조공정 섹션 -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                        <div class="flex justify-between items-center">
+                            <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider text-amber-800">제조공정 (순서대로 진행)</h4>
+                            <button type="button" onclick="addProcessRow()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1">
+                                <i class="fa-solid fa-plus"></i> 공정 추가
+                            </button>
+                        </div>
+                        <div id="formProcessRows" class="space-y-2"></div>
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">제조 공정</label>
-                        <textarea id="formProcess" rows="4" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="1. 반죽하기&#10;2. 휴지하기">${r.process || ''}</textarea>
-                    </div>
+
                     <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
-                        <button onclick="closeModal()" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium">취소</button>
-                        <button onclick="saveRecipeData()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium">저장하기</button>
+                        <button onclick="closeModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-sm font-medium transition">취소</button>
+                        <button onclick="saveRecipeData()" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition shadow-sm">저장하기</button>
                     </div>
                 </div>
             `;
         }
 
+        // 동적 배합 열(컬럼) 추가 함수
+        function addFormColumn(title = '예: 1개') {
+            const colId = 'form-col-' + Math.random().toString(36).substr(2, 9);
+            
+            const headerContainer = document.getElementById('formColumnsHeader');
+            const colHeaderDiv = document.createElement('div');
+            colHeaderDiv.id = 'header-' + colId;
+            colHeaderDiv.className = 'flex items-center gap-1 bg-white/80 p-1 rounded border border-amber-300 col-header-item';
+            colHeaderDiv.innerHTML = `
+                <input type="text" value="${title}" class="col-title-input w-full bg-transparent text-center text-xs font-bold text-amber-900 focus:outline-none">
+                <button type="button" onclick="removeFormColumn('${colId}')" class="text-slate-400 hover:text-rose-600 px-1"><i class="fa-solid fa-xmark text-xs"></i></button>
+            `;
+            headerContainer.appendChild(colHeaderDiv);
+
+            updateAllRowsGridStructure();
+        }
+
+        function removeFormColumn(colId) {
+            const headerContainer = document.getElementById('formColumnsHeader');
+            const colHeaders = headerContainer.querySelectorAll('.col-header-item');
+            
+            // 최소 1개의 배합 열은 유지하도록 방어
+            if (colHeaders.length <= 1) {
+                alert('최소 1개의 배합 칸은 유지되어야 합니다.');
+                return;
+            }
+
+            const headerEl = document.getElementById('header-' + colId);
+            if (!headerEl) return;
+            headerEl.remove();
+
+            updateAllRowsGridStructure();
+        }
+
+        // 헤더 열 개수 변화에 맞춰 모든 재료 행들의 입력 칸 구조를 100% 실시간 동기화
+        function updateAllRowsGridStructure() {
+            const headerContainer = document.getElementById('formColumnsHeader');
+            const colHeaders = headerContainer.querySelectorAll('.col-header-item');
+            const currentColsCount = colHeaders.length > 0 ? colHeaders.length : 1;
+            const gridClass = getGridColsClass(currentColsCount);
+
+            // 헤더 그리드 비율 클래스 적용
+            headerContainer.className = `col-span-7 grid ${gridClass} gap-2`;
+
+            // 모든 재료 행 순회하며 입력 칸 맞춤
+            const rows = document.querySelectorAll('.ingredient-row-item');
+            rows.forEach(row => {
+                const inputsContainer = row.querySelector('.ingredient-inputs-container');
+                inputsContainer.className = `col-span-7 grid ${gridClass} gap-2`;
+                
+                // 기존 입력된 값 백업
+                const existingInputs = inputsContainer.querySelectorAll('.ing-val-input');
+                const values = Array.from(existingInputs).map(inp => inp.value);
+
+                // 현재 열 개수만큼 input 재생성
+                let inputsHtml = '';
+                for(let i = 0; i < currentColsCount; i++) {
+                    const val = (values[i] !== undefined) ? values[i] : '';
+                    inputsHtml += `
+                        <div class="flex items-center gap-1">
+                            <input type="number" placeholder="0" value="${val}" class="ing-val-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-amber-500">
+                            <span class="text-xs text-slate-500">g</span>
+                        </div>
+                    `;
+                }
+                inputsContainer.innerHTML = inputsHtml;
+            });
+        }
+
+        // 재료 행 추가 함수
+        function addIngredientRow(name = '', values = [], memo = '') {
+            const container = document.getElementById('formIngredientRows');
+            const rowId = 'ing-row-' + Math.random().toString(36).substr(2, 9);
+            
+            const headerContainer = document.getElementById('formColumnsHeader');
+            const colHeaders = headerContainer.querySelectorAll('.col-header-item');
+            const colLen = colHeaders.length > 0 ? colHeaders.length : 1;
+            const gridClass = getGridColsClass(colLen);
+
+            const rowDiv = document.createElement('div');
+            rowDiv.id = rowId;
+            rowDiv.className = 'ingredient-row-item grid grid-cols-12 gap-2 items-center bg-slate-50/60 p-2 rounded-lg border border-slate-200';
+            
+            let inputsHtml = '';
+            for(let i = 0; i < colLen; i++) {
+                const val = (values && values[i] !== undefined) ? values[i] : '';
+                inputsHtml += `
+                    <div class="flex items-center gap-1">
+                        <input type="number" placeholder="0" value="${val}" class="ing-val-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-amber-500">
+                        <span class="text-xs text-slate-500">g</span>
+                    </div>
+                `;
+            }
+
+            rowDiv.innerHTML = `
+                <div class="col-span-3 pl-1">
+                    <input type="text" placeholder="재료명" value="${name}" class="ing-name-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-amber-500">
+                </div>
+                <div class="ingredient-inputs-container col-span-7 grid ${gridClass} gap-2">
+                    ${inputsHtml}
+                </div>
+                <div class="col-span-2 flex items-center gap-1.5 pl-1">
+                    <input type="text" placeholder="비고" value="${memo}" class="ing-memo-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500">
+                    <button type="button" onclick="document.getElementById('${rowId}').remove()" class="text-slate-400 hover:text-rose-600 transition p-1 shrink-0">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(rowDiv);
+        }
+
+        function addPrepRow(text = '') {
+            const container = document.getElementById('formPrepRows');
+            const rowId = 'prep-row-' + Math.random().toString(36).substr(2, 9);
+            const rowDiv = document.createElement('div');
+            rowDiv.id = rowId;
+            rowDiv.className = 'flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100';
+            rowDiv.innerHTML = `
+                <span class="text-amber-600 font-bold text-xs pl-1">•</span>
+                <input type="text" placeholder="준비 사항 입력..." value="${text}" class="prep-input flex-grow px-3 py-1.5 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500">
+                <button type="button" onclick="document.getElementById('${rowId}').remove()" class="text-slate-400 hover:text-rose-600 px-2 transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            `;
+            container.appendChild(rowDiv);
+        }
+
+        function addProcessRow(text = '') {
+            const container = document.getElementById('formProcessRows');
+            const rowCount = container.children.length + 1;
+            const rowId = 'proc-row-' + Math.random().toString(36).substr(2, 9);
+            const rowDiv = document.createElement('div');
+            rowDiv.id = rowId;
+            rowDiv.className = 'flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100';
+            rowDiv.innerHTML = `
+                <span class="proc-num bg-amber-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0">${rowCount}</span>
+                <input type="text" placeholder="공정 내용 입력..." value="${text}" class="proc-input flex-grow px-3 py-1.5 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500">
+                <button type="button" onclick="document.getElementById('${rowId}').remove(); updateProcessNumbers();" class="text-slate-400 hover:text-rose-600 px-2 transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            `;
+            container.appendChild(rowDiv);
+        }
+
+        function updateProcessNumbers() {
+            const rows = document.querySelectorAll('#formProcessRows > div');
+            rows.forEach((row, idx) => {
+                row.querySelector('.proc-num').innerText = idx + 1;
+            });
+        }
+
         function saveRecipeData() {
             const name = document.getElementById('formName').value.trim();
             const category = document.getElementById('formCategory').value;
-            const yieldText = document.getElementById('formYield').value.trim();
-            const rawIngredients = document.getElementById('formIngredients').value.trim();
-            const process = document.getElementById('formProcess').value.trim();
 
             if (!name) {
                 alert('제품명을 입력해주세요.');
                 return;
             }
 
-            const ingredients = rawIngredients.split('\n').map(line => {
-                const parts = line.split(':');
-                if (parts.length === 2) {
-                    return { name: parts[0].trim(), amount: Number(parts[1].trim()) || 0 };
-                }
-                return null;
-            }).filter(i => i !== null);
+            const columns = [];
+            document.querySelectorAll('.col-title-input').forEach(input => {
+                columns.push(input.value.trim() || '예: 1개');
+            });
 
-            const recipeData = { name, category, yield: yieldText, ingredients, process };
+            const ingredients = [];
+            document.querySelectorAll('.ingredient-row-item').forEach(row => {
+                const nameVal = row.querySelector('.ing-name-input').value.trim();
+                const memoVal = row.querySelector('.ing-memo-input').value.trim();
+                const values = [];
+                row.querySelectorAll('.ing-val-input').forEach(input => {
+                    const valNum = input.value.trim() !== '' ? Number(input.value.trim()) : 0;
+                    values.push(valNum);
+                });
+
+                if (nameVal) {
+                    ingredients.push({ name: nameVal, values, memo: memoVal });
+                }
+            });
+
+            const preparations = [];
+            document.querySelectorAll('.prep-input').forEach(input => {
+                if (input.value.trim()) preparations.push(input.value.trim());
+            });
+
+            const processes = [];
+            document.querySelectorAll('.proc-input').forEach(input => {
+                if (input.value.trim()) processes.push(input.value.trim());
+            });
+
+            const recipeData = { name, category, columns, ingredients, preparations, processes };
 
             if (currentRecipeId) {
                 const recipeRef = window.FB_Ref(window.FB_DB, `recipes/${currentRecipeId}`);
-                window.FB_Set(recipeRef, recipeData).then(() => {
-                    closeModal();
-                });
+                window.FB_Set(recipeRef, recipeData).then(() => closeModal());
             } else {
                 const newRef = window.FB_Push(window.FB_Ref(window.FB_DB, 'recipes'));
-                window.FB_Set(newRef, recipeData).then(() => {
-                    closeModal();
-                });
+                window.FB_Set(newRef, recipeData).then(() => closeModal());
             }
         }
 
         function deleteRecipe(id) {
-            if (confirm('정말 이 레시피를 삭제하시겠습니까?')) {
-                window.FB_Remove(window.FB_Ref(window.FB_DB, `recipes/${id}`)).then(() => {
-                    closeModal();
-                });
+            if (confirm('정말 이 레시피 카드를 삭제하시겠습니까?')) {
+                window.FB_Remove(window.FB_Ref(window.FB_DB, `recipes/${id}`)).then(() => closeModal());
             }
         }
 
@@ -346,14 +660,14 @@
             const data = recipes.map(r => ({
                 카테고리: r.category,
                 제품명: r.name,
-                생산기준: r.yield,
-                재료: (r.ingredients || []).map(i => `${i.name}(${i.amount}g)`).join(', '),
-                공정: r.process
+                배합표: (r.ingredients || []).map(i => `${i.name}(${i.values.join('/')}g)`).join(', '),
+                준비사항: (r.preparations || []).join(' / '),
+                제조공정: (r.processes || []).join(' / ')
             }));
             const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "레시피목록");
-            XLSX.writeFile(wb, "하레하레_레시피.xlsx");
+            XLSX.writeFile(wb, "하레하레_공용배합표.xlsx");
         }
     </script>
 </body>
