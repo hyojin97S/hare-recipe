@@ -83,7 +83,7 @@
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
                         <i class="fa-solid fa-search"></i>
                     </span>
-                    <input type="text" id="searchInput" oninput="filterRecipes()" placeholder="제품명, 재료 검색..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    <input type="text" lang="ko" id="searchInput" oninput="filterRecipes()" placeholder="제품명, 재료 검색..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
                 </div>
             </div>
 
@@ -118,7 +118,7 @@
         let currentCategory = '전체';
         let currentRecipeId = null;
 
-        const categories = ['전체', '빵', '쿠키', '케이크', '소스', '기타'];
+        const categories = ['전체', '빵', '쿠키', '케이크', '소스,크림', '기타'];
 
         function getGridColsClass(count) {
             const map = {
@@ -132,6 +132,19 @@
                 8: 'grid-cols-8'
             };
             return map[count] || 'grid-cols-4';
+        }
+
+        // 화면에 출력할 때 순수 숫자인 경우에만 천 단위 콤마를 붙여주는 유틸리티 함수
+        function formatDisplayNumber(val) {
+            if (val === undefined || val === null || val === '') return '';
+            let strVal = String(val).trim();
+            // 소수점 포함 순수 숫자인 경우에만 콤마 포맷팅 적용 (문자, 기호가 섞여있으면 원본 그대로 유지)
+            if (/^\d+(\.\d+)?$/.test(strVal)) {
+                let parts = strVal.split('.');
+                let integerPart = Number(parts[0]).toLocaleString();
+                return parts.length > 1 ? `${integerPart}.${parts[1]}` : integerPart;
+            }
+            return strVal;
         }
 
         window.addEventListener('firebase-ready', () => {
@@ -201,8 +214,8 @@
                         <h3 class="text-base font-bold text-slate-900 mb-1">${r.name}</h3>
                         <div class="space-y-1 text-xs text-slate-600 mb-4 border-t border-slate-100 pt-2">
                             ${(r.ingredients || []).slice(0, 3).map(i => {
-                                const firstVal = i.values && i.values.length > 0 ? i.values[0] : 0;
-                                return `<div class="flex justify-between"><span>${i.name}</span><span class="font-medium">${firstVal}g</span></div>`;
+                                const firstVal = i.values && i.values.length > 0 ? formatDisplayNumber(i.values[0]) : '';
+                                return `<div class="flex justify-between"><span>${i.name}</span><span class="font-medium">${firstVal}</span></div>`;
                             }).join('')}
                             ${(r.ingredients || []).length > 3 ? `<div class="text-slate-400 text-right">+외 ${r.ingredients.length - 3}개 재료</div>` : ''}
                         </div>
@@ -227,7 +240,7 @@
             const r = recipes.find(item => item.id === id);
             if (!r) return;
 
-            const cols = r.columns || ['배합'];
+            const cols = r.columns && r.columns.length > 0 ? r.columns : [''];
             const gridClass = getGridColsClass(cols.length);
 
             document.getElementById('modalTitle').innerText = `레시피 카드 - ${r.name}`;
@@ -260,7 +273,7 @@
                                     <div class="grid grid-cols-12 gap-2 items-center bg-slate-50/50 p-2 rounded-lg border border-slate-100 text-xs">
                                         <div class="col-span-3 font-semibold text-slate-800 pl-2">${i.name}</div>
                                         <div class="col-span-7 grid ${gridClass} gap-2">
-                                            ${cols.map((_, idx) => `<div class="text-center font-bold text-amber-900">${i.values[idx] !== undefined && i.values[idx] !== '' ? i.values[idx] + 'g' : '-'}</div>`).join('')}
+                                            ${cols.map((_, idx) => `<div class="text-center font-bold text-amber-900">${i.values[idx] !== undefined && i.values[idx] !== '' ? formatDisplayNumber(i.values[idx]) : '-'}</div>`).join('')}
                                         </div>
                                         <div class="col-span-2 text-slate-500 pl-2 truncate">${i.memo || '-'}</div>
                                     </div>
@@ -281,7 +294,15 @@
                     <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
                         <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider text-amber-800">제조공정 (순서대로 진행)</h4>
                         <div class="text-xs text-slate-700 whitespace-pre-line leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">
-                            ${r.processes && r.processes.length > 0 ? r.processes.map((p, idx) => `${idx + 1}. ${p}`).join('\n') : '-'}
+                            ${r.processes && r.processes.length > 0 ? r.processes.map((p, idx) => `${idx + 1}.${p}`).join('\n') : '-'}
+                        </div>
+                    </div>
+
+                    <!-- 비고 섹션 -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
+                        <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider text-amber-800">비고</h4>
+                        <div class="text-xs text-slate-700 whitespace-pre-line leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100 min-h-[60px]">
+                            ${r.remarks ? r.remarks : '-'}
                         </div>
                     </div>
 
@@ -313,7 +334,7 @@
             document.getElementById('recipeModal').classList.remove('hidden');
             
             setTimeout(() => {
-                addFormColumn();
+                addFormColumn('');
                 addIngredientRow();
                 addPrepRow('');
                 addProcessRow('');
@@ -333,7 +354,7 @@
                 if (r.columns && r.columns.length > 0) {
                     r.columns.forEach(c => addFormColumn(c));
                 } else {
-                    addFormColumn('배합');
+                    addFormColumn('');
                 }
 
                 if (r.ingredients && r.ingredients.length > 0) {
@@ -362,7 +383,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                         <div>
                             <label class="block text-xs font-semibold text-slate-500 mb-1">제품명</label>
-                            <input type="text" id="formName" lang="ko" value="${r.name || ''}" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none" placeholder="">
+                            <input type="text" lang="ko" id="formName" value="${r.name || ''}" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none" placeholder="">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-500 mb-1">카테고리</label>
@@ -422,6 +443,12 @@
                         <div id="formProcessRows" class="space-y-2"></div>
                     </div>
 
+                    <!-- 비고 섹션 추가 -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
+                        <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider text-amber-800">비고</h4>
+                        <textarea lang="ko" id="formRemarks" rows="4" placeholder="비고 내용을 입력하세요..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-amber-500">${r.remarks || ''}</textarea>
+                    </div>
+
                     <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
                         <button onclick="closeModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-sm font-medium transition">취소</button>
                         <button onclick="saveRecipeData()" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition shadow-sm">저장하기</button>
@@ -459,7 +486,7 @@
             headerContainer.innerHTML = '';
             ingredientContainer.innerHTML = '';
 
-            const cols = savedData.columns.length > 0 ? savedData.columns : ['배합'];
+            const cols = savedData.columns.length > 0 ? savedData.columns : [''];
             const gridClass = getGridColsClass(cols.length);
             headerContainer.className = `col-span-7 grid ${gridClass} gap-2`;
 
@@ -473,8 +500,9 @@
                 
                 const inputElem = document.createElement('input');
                 inputElem.type = 'text';
-                inputElem.lang = 'ko';
+                inputElem.setAttribute('lang', 'ko');
                 inputElem.value = colTitle;
+                inputElem.placeholder = '배합명';
                 inputElem.className = 'col-title-input w-full bg-transparent text-center text-xs font-bold text-amber-900 focus:outline-none';
                 
                 if (focusTarget === 'new-col' && index === cols.length - 1) {
@@ -508,8 +536,7 @@
                     const val = (ing.values && ing.values[i] !== undefined) ? ing.values[i] : '';
                     inputsHtml += `
                         <div class="flex items-center gap-1">
-                            <input type="number" placeholder="0" value="${val}" class="ing-val-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-amber-500">
-                            <span class="text-xs text-slate-500">g</span>
+                            <input type="text" lang="ko" placeholder="" value="${val}" class="ing-val-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-amber-500">
                         </div>
                     `;
                 }
@@ -519,7 +546,7 @@
                 
                 const nameInput = document.createElement('input');
                 nameInput.type = 'text';
-                nameInput.lang = 'ko';
+                nameInput.setAttribute('lang', 'ko');
                 nameInput.placeholder = '재료명';
                 nameInput.value = ing.name || '';
                 nameInput.className = 'ing-name-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-amber-500';
@@ -538,7 +565,7 @@
                 
                 const memoInput = document.createElement('input');
                 memoInput.type = 'text';
-                memoInput.lang = 'ko';
+                memoInput.setAttribute('lang', 'ko');
                 memoInput.placeholder = '비고';
                 memoInput.value = ing.memo || '';
                 memoInput.className = 'ing-memo-input w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500';
@@ -559,7 +586,6 @@
                 ingredientContainer.appendChild(rowDiv);
             });
 
-            // 새로 추가된 요소에 포커스를 주어 한글 입력기(IME)가 곧바로 활성화되도록 설정
             setTimeout(() => {
                 if (focusTarget === 'new-col' && lastColInput) {
                     lastColInput.focus();
@@ -575,9 +601,9 @@
         function addFormColumn(specificTitle = '') {
             const currentData = captureCurrentTableData();
             if (currentData.columns.length === 0) {
-                currentData.columns.push(specificTitle || '배합');
+                currentData.columns.push(specificTitle);
             } else {
-                currentData.columns.push(specificTitle || `배합 ${currentData.columns.length + 1}`);
+                currentData.columns.push(specificTitle);
                 currentData.ingredients.forEach(ing => {
                     if (!ing.values) ing.values = [];
                     ing.values.push('');
@@ -614,7 +640,7 @@
         function addIngredientRow(name = '', values = [], memo = '') {
             const currentData = captureCurrentTableData();
             if (currentData.columns.length === 0) {
-                currentData.columns.push('배합');
+                currentData.columns.push('');
             }
 
             const defaultValues = values.length > 0 ? values : new Array(currentData.columns.length).fill('');
@@ -632,7 +658,7 @@
             
             const inputElem = document.createElement('input');
             inputElem.type = 'text';
-            inputElem.lang = 'ko';
+            inputElem.setAttribute('lang', 'ko');
             inputElem.placeholder = '준비 사항 입력...';
             inputElem.value = text;
             inputElem.className = 'prep-input flex-grow px-3 py-1.5 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500';
@@ -666,7 +692,7 @@
             
             const inputElem = document.createElement('input');
             inputElem.type = 'text';
-            inputElem.lang = 'ko';
+            inputElem.setAttribute('lang', 'ko');
             inputElem.placeholder = '공정 내용 입력...';
             inputElem.value = text;
             inputElem.className = 'proc-input flex-grow px-3 py-1.5 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500';
@@ -708,7 +734,7 @@
 
             const columns = [];
             document.querySelectorAll('.col-title-input').forEach(input => {
-                columns.push(input.value.trim() || '배합');
+                columns.push(input.value.trim());
             });
 
             const ingredients = [];
@@ -717,8 +743,7 @@
                 const memoVal = row.querySelector('.ing-memo-input').value.trim();
                 const values = [];
                 row.querySelectorAll('.ing-val-input').forEach(input => {
-                    const valNum = input.value.trim() !== '' ? Number(input.value.trim()) : 0;
-                    values.push(valNum);
+                    values.push(input.value.trim());
                 });
 
                 if (nameVal) {
@@ -736,7 +761,9 @@
                 if (input.value.trim()) processes.push(input.value.trim());
             });
 
-            const recipeData = { name, category, columns, ingredients, preparations, processes };
+            const remarks = document.getElementById('formRemarks').value.trim();
+
+            const recipeData = { name, category, columns, ingredients, preparations, processes, remarks };
 
             if (currentRecipeId) {
                 const recipeRef = window.FB_Ref(window.FB_DB, `recipes/${currentRecipeId}`);
@@ -765,9 +792,10 @@
             const data = recipes.map(r => ({
                 카테고리: r.category,
                 제품명: r.name,
-                배합표: (r.ingredients || []).map(i => `${i.name}(${i.values.join('/')}g)`).join(', '),
+                배합표: (r.ingredients || []).map(i => `${i.name}(${i.values.join('/')})`).join(', '),
                 준비사항: (r.preparations || []).join(' / '),
-                제조공정: (r.processes || []).join(' / ')
+                제조공정: (r.processes || []).join(' / '),
+                비고: r.remarks || ''
             }));
             const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
